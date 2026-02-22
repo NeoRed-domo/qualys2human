@@ -4,6 +4,7 @@ import { PlayCircleOutlined } from '@ant-design/icons';
 import api from '../api/client';
 import TrendBuilder, { type TrendQueryParams } from '../components/trends/TrendBuilder';
 import TrendChart from '../components/trends/TrendChart';
+import ExportButtons from '../components/ExportButtons';
 
 interface DataPoint {
   date: string;
@@ -56,6 +57,9 @@ export default function Trends() {
 
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <ExportButtons queryString="view=overview" />
+      </div>
       <TrendBuilder onQuery={runQuery} loading={loading} />
 
       {templates.length > 0 && (

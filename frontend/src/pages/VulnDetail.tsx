@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef } from 'ag-grid-community';
 import api from '../api/client';
+import ExportButtons from '../components/ExportButtons';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -106,14 +107,12 @@ export default function VulnDetail() {
 
   return (
     <div>
-      <Button
-        icon={<ArrowLeftOutlined />}
-        type="link"
-        onClick={() => navigate(-1)}
-        style={{ marginBottom: 12, padding: 0 }}
-      >
-        Retour
-      </Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Button icon={<ArrowLeftOutlined />} type="link" onClick={() => navigate(-1)} style={{ padding: 0 }}>
+          Retour
+        </Button>
+        <ExportButtons queryString={`view=vulnerability&qid=${qid}`} />
+      </div>
 
       <Card
         title={

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Descriptions, Tag, Row, Col, Spin, Alert, Button, Typography, Divider } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import api from '../api/client';
+import ExportButtons from '../components/ExportButtons';
 
 const { Paragraph, Text } = Typography;
 
@@ -91,14 +92,12 @@ export default function FullDetail() {
 
   return (
     <div>
-      <Button
-        icon={<ArrowLeftOutlined />}
-        type="link"
-        onClick={() => navigate(-1)}
-        style={{ marginBottom: 12, padding: 0 }}
-      >
-        Retour
-      </Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Button icon={<ArrowLeftOutlined />} type="link" onClick={() => navigate(-1)} style={{ padding: 0 }}>
+          Retour
+        </Button>
+        <ExportButtons queryString={`view=detail&ip=${ip}&qid=${qid}`} />
+      </div>
 
       <Card
         title={

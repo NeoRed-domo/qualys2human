@@ -9,6 +9,7 @@ import SeverityDonut from '../components/dashboard/SeverityDonut';
 import CategoryBar from '../components/dashboard/CategoryBar';
 import TopVulnsTable from '../components/dashboard/TopVulnsTable';
 import TopHostsTable from '../components/dashboard/TopHostsTable';
+import ExportButtons from '../components/ExportButtons';
 
 interface OverviewData {
   total_vulns: number;
@@ -51,9 +52,14 @@ export default function Overview() {
     return <Alert message="Erreur" description={error} type="error" showIcon />;
   }
 
+  const exportQs = `view=overview${toQueryString() ? '&' + toQueryString() : ''}`;
+
   return (
     <div>
-      <FilterBar />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <FilterBar />
+        <ExportButtons queryString={exportQs} />
+      </div>
 
       <Spin spinning={loading}>
         {data && (
