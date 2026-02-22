@@ -4,6 +4,9 @@ import { FilterProvider } from './contexts/FilterContext';
 import Login from './pages/Login';
 import MainLayout from './layouts/MainLayout';
 import Overview from './pages/Overview';
+import VulnDetail from './pages/VulnDetail';
+import HostDetail from './pages/HostDetail';
+import FullDetail from './pages/FullDetail';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -37,9 +40,9 @@ export default function AppRouter() {
           <Route path="admin" element={<Placeholder title="Administration" />} />
           <Route path="monitoring" element={<Placeholder title="Monitoring" />} />
           <Route path="profile" element={<Placeholder title="Mon Profil" />} />
-          <Route path="vulnerabilities/:qid" element={<Placeholder title="Détail Vulnérabilité" />} />
-          <Route path="hosts/:ip" element={<Placeholder title="Détail Hôte" />} />
-          <Route path="hosts/:ip/vulnerabilities/:qid" element={<Placeholder title="Détail Complet" />} />
+          <Route path="vulnerabilities/:qid" element={<VulnDetail />} />
+          <Route path="hosts/:ip" element={<HostDetail />} />
+          <Route path="hosts/:ip/vulnerabilities/:qid" element={<FullDetail />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
