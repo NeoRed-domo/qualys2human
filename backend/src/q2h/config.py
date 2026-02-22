@@ -19,9 +19,17 @@ class ServerConfig(BaseSettings):
     tls_key: str = "./certs/server.key"
 
 
+class WatcherConfig(BaseSettings):
+    enabled: bool = False
+    paths: list[str] = []
+    poll_interval: int = 10  # seconds between poll cycles
+    stable_seconds: int = 5  # wait for file to stop growing
+
+
 class Settings(BaseSettings):
     server: ServerConfig = ServerConfig()
     database: DatabaseConfig = DatabaseConfig()
+    watcher: WatcherConfig = WatcherConfig()
 
     @classmethod
     def from_yaml(cls, path: Path) -> "Settings":

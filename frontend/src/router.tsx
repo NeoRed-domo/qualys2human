@@ -8,6 +8,7 @@ import VulnDetail from './pages/VulnDetail';
 import HostDetail from './pages/HostDetail';
 import FullDetail from './pages/FullDetail';
 import Trends from './pages/Trends';
+import ImportManager from './pages/admin/ImportManager';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -38,7 +39,8 @@ export default function AppRouter() {
         >
           <Route index element={<Overview />} />
           <Route path="trends" element={<Trends />} />
-          <Route path="admin" element={<Placeholder title="Administration" />} />
+          <Route path="admin" element={<ImportManager />} />
+          <Route path="admin/imports" element={<ImportManager />} />
           <Route path="monitoring" element={<Placeholder title="Monitoring" />} />
           <Route path="profile" element={<Placeholder title="Mon Profil" />} />
           <Route path="vulnerabilities/:qid" element={<VulnDetail />} />
