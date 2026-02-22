@@ -17,6 +17,14 @@ def init_engine():
     SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+async def dispose_engine():
+    global engine, SessionLocal
+    if engine is not None:
+        await engine.dispose()
+        engine = None
+        SessionLocal = None
+
+
 async def get_db():
     if SessionLocal is None:
         init_engine()

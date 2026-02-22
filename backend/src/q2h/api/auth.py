@@ -48,7 +48,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     profile_result = await db.execute(select(Profile).where(Profile.id == user.profile_id))
     profile = profile_result.scalar_one()
 
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.utcnow()
     db.add(AuditLog(user_id=user.id, action="login", detail=f"domain={req.domain}"))
     await db.commit()
 
