@@ -3,12 +3,16 @@ import { useAuth } from './contexts/AuthContext';
 import { FilterProvider } from './contexts/FilterContext';
 import Login from './pages/Login';
 import MainLayout from './layouts/MainLayout';
+import AdminLayout from './layouts/AdminLayout';
 import Overview from './pages/Overview';
 import VulnDetail from './pages/VulnDetail';
 import HostDetail from './pages/HostDetail';
 import FullDetail from './pages/FullDetail';
 import Trends from './pages/Trends';
 import ImportManager from './pages/admin/ImportManager';
+import UserManagement from './pages/admin/UserManagement';
+import EnterpriseRules from './pages/admin/EnterpriseRules';
+import Branding from './pages/admin/Branding';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -39,8 +43,13 @@ export default function AppRouter() {
         >
           <Route index element={<Overview />} />
           <Route path="trends" element={<Trends />} />
-          <Route path="admin" element={<ImportManager />} />
-          <Route path="admin/imports" element={<ImportManager />} />
+          <Route path="admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/imports" replace />} />
+            <Route path="imports" element={<ImportManager />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="rules" element={<EnterpriseRules />} />
+            <Route path="branding" element={<Branding />} />
+          </Route>
           <Route path="monitoring" element={<Placeholder title="Monitoring" />} />
           <Route path="profile" element={<Placeholder title="Mon Profil" />} />
           <Route path="vulnerabilities/:qid" element={<VulnDetail />} />

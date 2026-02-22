@@ -12,6 +12,8 @@ from q2h.api.presets import router as presets_router
 from q2h.api.trends import router as trends_router
 from q2h.api.export import router as export_router
 from q2h.api.imports import router as imports_router
+from q2h.api.users import router as users_router
+from q2h.api.branding import router as branding_router
 
 logger = logging.getLogger("q2h")
 
@@ -57,6 +59,8 @@ app.include_router(presets_router)
 app.include_router(trends_router)
 app.include_router(export_router)
 app.include_router(imports_router)
+app.include_router(users_router)
+app.include_router(branding_router)
 
 
 @app.get("/api/health")
