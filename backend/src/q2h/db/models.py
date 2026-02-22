@@ -118,3 +118,45 @@ class ReportCoherenceCheck(Base):
     detected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     scan_report: Mapped["ScanReport"] = relationship(back_populates="coherence_checks")
+
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    type: Mapped[str] = mapped_column(String(20))  # builtin/custom
+    permissions: Mapped[dict] = mapped_column(JSONB, default=dict)
+    ad_group_dn: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    users: Mapped[list["User"]] = relationship(back_populates="profile")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    auth_type: Mapped[str] = mapped_column(String(20))  # local/ad
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id"))
+    ad_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    preferences: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    profile: Mapped["Profile"] = relationship(back_populates="users")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    action: Mapped[str] = mapped_column(String(100))
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
