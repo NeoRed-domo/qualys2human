@@ -13,6 +13,7 @@ import ImportManager from './pages/admin/ImportManager';
 import UserManagement from './pages/admin/UserManagement';
 import EnterpriseRules from './pages/admin/EnterpriseRules';
 import Branding from './pages/admin/Branding';
+import Monitoring from './pages/Monitoring';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -50,7 +51,7 @@ export default function AppRouter() {
             <Route path="rules" element={<EnterpriseRules />} />
             <Route path="branding" element={<Branding />} />
           </Route>
-          <Route path="monitoring" element={<Placeholder title="Monitoring" />} />
+          <Route path="monitoring" element={<Monitoring />} />
           <Route path="profile" element={<Placeholder title="Mon Profil" />} />
           <Route path="vulnerabilities/:qid" element={<VulnDetail />} />
           <Route path="hosts/:ip" element={<HostDetail />} />
