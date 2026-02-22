@@ -3,8 +3,7 @@
 Can be called directly:
     python -m q2h.service
 
-Or via NSSM as a Windows service:
-    nssm install Qualys2Human <python_path> <this_script_path>
+Or via WinSW as a Windows service (see installer/service.py)
 """
 
 import logging

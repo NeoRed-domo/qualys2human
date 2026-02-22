@@ -1,7 +1,9 @@
 ##############################################
-# Qualys2Human — Configuration Template
-# Copy this file to backend/config.yaml
-# and adjust values for your environment.
+# Qualys2Human — Configuration Reference
+#
+# This file is for reference only.
+# The installer generates config.yaml automatically
+# with secure random passwords.
 ##############################################
 
 server:
@@ -15,7 +17,7 @@ database:
   port: 5432
   name: "qualys2human"
   user: "q2h"
-  password: "CHANGE_ME"
+  password: ""  # Generated automatically by installer
   encryption_key_file: "./keys/master.key"
 
 watcher:

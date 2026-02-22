@@ -1,14 +1,15 @@
-"""Build script — compiles frontend, collects backend + dependencies.
+"""Build script — compiles frontend, prepares embedded Python with deps, collects backend.
 
 Usage:
     python scripts/build.py [--output-dir dist]
 
 Produces a `dist/` folder with:
     dist/
-    ├── backend/         (Python source + installed deps in .venv)
-    ├── frontend/        (Vite production build → static files)
-    ├── data/            (branding assets)
-    └── config.yaml      (template config)
+    ├── python/          (embedded Python 3.12 + all backend dependencies)
+    ├── app/
+    │   ├── backend/     (Python source + alembic)
+    │   └── frontend/    (Vite production build → static files)
+    └── data/            (branding assets)
 """
 
 import argparse
@@ -16,12 +17,14 @@ import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BACKEND_DIR = ROOT / "backend"
 FRONTEND_DIR = ROOT / "frontend"
 DATA_DIR = ROOT / "data"
+PREREQS_DIR = ROOT / "prerequisites"
 
 
 def run(cmd: list[str], cwd: Path | None = None, env=None):
@@ -40,17 +43,98 @@ def build_frontend(output: Path):
     run(["npx", "vite", "build"], cwd=FRONTEND_DIR)
 
     src = FRONTEND_DIR / "dist"
-    dst = output / "frontend"
+    dst = output / "app" / "frontend"
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
     print(f"  Frontend build copied to {dst}")
 
 
+def prepare_python(output: Path):
+    """Prepare embedded Python with all backend dependencies pre-installed."""
+    print("\n=== Preparing embedded Python ===")
+    dst = output / "python"
+    if dst.exists():
+        shutil.rmtree(dst)
+
+    # Find the embedded Python zip
+    embed_dir = PREREQS_DIR / "python-embed"
+    embed_zips = list(embed_dir.glob("python-*.zip")) if embed_dir.exists() else []
+
+    if not embed_zips:
+        print("  WARNING: No embedded Python zip found in prerequisites/python-embed/")
+        print("  Download from: https://www.python.org/ftp/python/3.12.x/python-3.12.x-embed-amd64.zip")
+        print("  Falling back to venv-based build...")
+        _fallback_venv(output)
+        return
+
+    embed_zip = embed_zips[0]
+    print(f"  Extracting {embed_zip.name}...")
+    with zipfile.ZipFile(embed_zip, "r") as zf:
+        zf.extractall(dst)
+
+    # Enable pip in embedded Python by editing python312._pth
+    pth_files = list(dst.glob("python*._pth"))
+    if pth_files:
+        pth = pth_files[0]
+        content = pth.read_text()
+        # Uncomment "import site" line
+        content = content.replace("#import site", "import site")
+        pth.write_text(content)
+        print(f"  Enabled site-packages in {pth.name}")
+
+    # Install pip into embedded Python
+    python_exe = dst / "python.exe"
+    if not python_exe.exists():
+        print("  ERROR: python.exe not found in embedded Python")
+        sys.exit(1)
+
+    # Download and run get-pip.py
+    get_pip = dst / "get-pip.py"
+    if not get_pip.exists():
+        import urllib.request
+        print("  Downloading get-pip.py...")
+        urllib.request.urlretrieve("https://bootstrap.pypa.io/get-pip.py", get_pip)
+
+    run([str(python_exe), str(get_pip), "--no-warn-script-location"], cwd=dst)
+
+    # Install backend dependencies into the embedded Python
+    site_packages = dst / "Lib" / "site-packages"
+    site_packages.mkdir(parents=True, exist_ok=True)
+
+    print("  Installing backend dependencies...")
+    run([
+        str(python_exe), "-m", "pip", "install",
+        "--target", str(site_packages),
+        "--no-warn-script-location",
+        str(BACKEND_DIR),
+    ])
+
+    # Cleanup get-pip
+    if get_pip.exists():
+        get_pip.unlink()
+
+    print(f"  Embedded Python ready at {dst}")
+
+
+def _fallback_venv(output: Path):
+    """Fallback: create a venv if no embedded Python available."""
+    dst = output / "python"
+    print("  Creating virtual environment (fallback)...")
+    run([sys.executable, "-m", "venv", str(dst)])
+
+    if os.name == "nt":
+        pip = str(dst / "Scripts" / "pip.exe")
+    else:
+        pip = str(dst / "bin" / "pip")
+
+    run([pip, "install", "--no-cache-dir", str(BACKEND_DIR)])
+
+
 def collect_backend(output: Path):
-    """Copy backend source and install dependencies into a virtual env."""
-    print("\n=== Collecting backend ===")
-    dst = output / "backend"
+    """Copy backend source (without creating a venv — deps are in embedded Python)."""
+    print("\n=== Collecting backend source ===")
+    dst = output / "app" / "backend"
     if dst.exists():
         shutil.rmtree(dst)
 
@@ -58,11 +142,8 @@ def collect_backend(output: Path):
     src_dir = BACKEND_DIR / "src"
     shutil.copytree(src_dir, dst / "src")
 
-    # Copy pyproject.toml and config
+    # Copy pyproject.toml
     shutil.copy2(BACKEND_DIR / "pyproject.toml", dst / "pyproject.toml")
-    config_yaml = BACKEND_DIR / "config.yaml"
-    if config_yaml.exists():
-        shutil.copy2(config_yaml, dst / "config.yaml")
 
     # Copy alembic config and migrations
     alembic_ini = BACKEND_DIR / "alembic.ini"
@@ -72,19 +153,7 @@ def collect_backend(output: Path):
     if alembic_dir.exists():
         shutil.copytree(alembic_dir, dst / "alembic")
 
-    # Install dependencies into a local venv
-    venv_dir = dst / ".venv"
-    print(f"  Creating virtual environment at {venv_dir}")
-    run([sys.executable, "-m", "venv", str(venv_dir)])
-
-    # Determine pip path
-    if os.name == "nt":
-        pip = str(venv_dir / "Scripts" / "pip.exe")
-    else:
-        pip = str(venv_dir / "bin" / "pip")
-
-    run([pip, "install", "--no-cache-dir", str(dst)])
-    print(f"  Backend collected to {dst}")
+    print(f"  Backend source collected to {dst}")
 
 
 def collect_data(output: Path):
@@ -105,6 +174,7 @@ def main():
     parser.add_argument("--output-dir", default="dist", help="Output directory (default: dist)")
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend build")
     parser.add_argument("--skip-backend", action="store_true", help="Skip backend collection")
+    parser.add_argument("--skip-python", action="store_true", help="Skip Python preparation")
     args = parser.parse_args()
 
     output = ROOT / args.output_dir
@@ -113,6 +183,8 @@ def main():
 
     if not args.skip_frontend:
         build_frontend(output)
+    if not args.skip_python:
+        prepare_python(output)
     if not args.skip_backend:
         collect_backend(output)
     collect_data(output)
