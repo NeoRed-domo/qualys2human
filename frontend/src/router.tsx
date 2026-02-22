@@ -7,6 +7,7 @@ import Overview from './pages/Overview';
 import VulnDetail from './pages/VulnDetail';
 import HostDetail from './pages/HostDetail';
 import FullDetail from './pages/FullDetail';
+import Trends from './pages/Trends';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -36,7 +37,7 @@ export default function AppRouter() {
           }
         >
           <Route index element={<Overview />} />
-          <Route path="trends" element={<Placeholder title="Tendances" />} />
+          <Route path="trends" element={<Trends />} />
           <Route path="admin" element={<Placeholder title="Administration" />} />
           <Route path="monitoring" element={<Placeholder title="Monitoring" />} />
           <Route path="profile" element={<Placeholder title="Mon Profil" />} />
