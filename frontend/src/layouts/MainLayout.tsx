@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import AppFooter from '../components/AppFooter';
 
 const { Header, Content } = Layout;
 
@@ -76,9 +77,10 @@ export default function MainLayout() {
         </Dropdown>
       </Header>
 
-      <Content style={{ padding: 24, background: '#f0f2f5' }}>
+      <Content style={{ padding: 24, background: '#f0f2f5', flex: 1 }}>
         <Outlet />
       </Content>
+      <AppFooter />
     </Layout>
   );
 }

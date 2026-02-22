@@ -1,9 +1,11 @@
-"""Branding API — logo upload, retrieval, and template download."""
+"""Branding API — logo upload, retrieval, template download, and settings."""
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from q2h.auth.dependencies import get_current_user, require_admin
 
@@ -13,13 +15,46 @@ BRANDING_DIR = Path(__file__).parent.parent.parent.parent.parent / "data" / "bra
 DEFAULT_LOGO = BRANDING_DIR / "logo-default.svg"
 CUSTOM_LOGO = BRANDING_DIR / "logo-custom"
 TEMPLATE = BRANDING_DIR / "logo-template.svg"
+SETTINGS_FILE = BRANDING_DIR / "settings.json"
 
 MAX_LOGO_SIZE = 500 * 1024  # 500 KB
 ALLOWED_EXTENSIONS = {".svg", ".png", ".jpg", ".jpeg"}
 
 
+class BrandingSettings(BaseModel):
+    footer_text: str = ""
+
+
+def _read_settings() -> dict:
+    if SETTINGS_FILE.exists():
+        try:
+            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {"footer_text": ""}
+    return {"footer_text": ""}
+
+
+def _write_settings(data: dict) -> None:
+    BRANDING_DIR.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@router.get("/settings")
+async def get_settings():
+    """Return branding settings (public — used on login page)."""
+    return _read_settings()
+
+
+@router.put("/settings")
+async def update_settings(body: BrandingSettings, user: dict = Depends(require_admin)):
+    """Update branding settings (admin only)."""
+    data = {"footer_text": body.footer_text}
+    _write_settings(data)
+    return data
+
+
 @router.get("/logo")
-async def get_logo(user: dict = Depends(get_current_user)):
+async def get_logo():
     """Return the current logo (custom if exists, otherwise default)."""
     # Check for custom logo with any extension
     for ext in ALLOWED_EXTENSIONS:

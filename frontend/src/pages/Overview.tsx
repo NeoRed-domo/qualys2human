@@ -6,6 +6,7 @@ import { useFilters } from '../contexts/FilterContext';
 import FilterBar from '../components/filters/FilterBar';
 import KPICards from '../components/dashboard/KPICards';
 import SeverityDonut from '../components/dashboard/SeverityDonut';
+import LayerDonut from '../components/dashboard/LayerDonut';
 import CategoryBar from '../components/dashboard/CategoryBar';
 import TopVulnsTable from '../components/dashboard/TopVulnsTable';
 import TopHostsTable from '../components/dashboard/TopHostsTable';
@@ -21,16 +22,18 @@ interface OverviewData {
   top_vulns: { qid: number; title: string; severity: number; count: number }[];
   top_hosts: { ip: string; dns: string | null; os: string | null; host_count: number }[];
   coherence_checks: { check_type: string; severity: string }[];
+  layer_distribution: { name: string | null; color: string | null; count: number }[];
 }
 
 export default function Overview() {
   const navigate = useNavigate();
-  const { toQueryString, severities, types, dateFrom, dateTo, reportId } = useFilters();
+  const { toQueryString, severities, types, layers, dateFrom, dateTo, reportId, ready } = useFilters();
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!ready) return; // Wait for enterprise rules to load before fetching
     let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
@@ -48,7 +51,7 @@ export default function Overview() {
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [severities, types, dateFrom, dateTo, reportId, toQueryString]);
+  }, [severities, types, layers, dateFrom, dateTo, reportId, toQueryString, ready]);
 
   if (error) {
     return <Alert message="Erreur" description={error} type="error" showIcon />;
@@ -76,6 +79,11 @@ export default function Overview() {
           content: <SeverityDonut data={data.severity_distribution} />,
         },
         {
+          key: 'layer',
+          label: 'Répartition par catégorisation',
+          content: <LayerDonut data={data.layer_distribution} />,
+        },
+        {
           key: 'category',
           label: 'Top vulnérabilités (graphique)',
           content: (
@@ -100,13 +108,12 @@ export default function Overview() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <FilterBar extra={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FilterBar />
+          <ExportButtons queryString={exportQs} />
           <HelpTooltip topic="overview" />
         </div>
-        <ExportButtons queryString={exportQs} />
-      </div>
+      } />
 
       <Spin spinning={loading}>
         {data && <WidgetGrid widgets={widgets} />}

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Select, Alert, Typography } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import AppFooter from '../components/AppFooter';
 
 const { Title } = Typography;
 
@@ -9,6 +10,18 @@ export default function Login() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/branding/logo')
+      .then((resp) => {
+        if (!resp.ok) throw new Error('No logo');
+        return resp.blob();
+      })
+      .then((blob) => setLogoUrl(URL.createObjectURL(blob)))
+      .catch(() => setLogoError(true));
+  }, []);
 
   const onFinish = async (values: { username: string; password: string; domain: string }) => {
     setLoading(true);
@@ -25,15 +38,29 @@ export default function Login() {
   return (
     <div style={{
       display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
+      flexDirection: 'column',
       minHeight: '100vh',
       background: '#f0f2f5',
     }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
       <Card style={{ width: 400, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={3} style={{ margin: 0 }}>Qualys2Human</Title>
-          <Typography.Text type="secondary">Connexion</Typography.Text>
+          {logoUrl && !logoError ? (
+            <img
+              src={logoUrl}
+              alt="Logo"
+              style={{ maxHeight: 60, maxWidth: 300, marginBottom: 8 }}
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <Title level={3} style={{ margin: 0 }}>Qualys2Human</Title>
+          )}
+          <div><Typography.Text type="secondary">Connexion</Typography.Text></div>
         </div>
 
         {error && (
@@ -98,6 +125,8 @@ export default function Login() {
           </Form.Item>
         </Form>
       </Card>
+      </div>
+      <AppFooter />
     </div>
   );
 }

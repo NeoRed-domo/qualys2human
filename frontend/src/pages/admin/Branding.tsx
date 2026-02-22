@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Upload, Button, message, Space, Typography, Image } from 'antd';
-import { UploadOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Card, Upload, Button, message, Space, Typography, Image, Input } from 'antd';
+import { UploadOutlined, DeleteOutlined, DownloadOutlined, SaveOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import api from '../../api/client';
 
@@ -11,10 +11,12 @@ export default function Branding() {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [footerText, setFooterText] = useState('');
+  const [savingFooter, setSavingFooter] = useState(false);
 
   useEffect(() => {
+    // Fetch logo
     const token = localStorage.getItem('access_token');
-    // Fetch as blob to create an object URL
     fetch('/api/branding/logo', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -24,6 +26,12 @@ export default function Branding() {
       })
       .then((blob) => setLogoUrl(URL.createObjectURL(blob)))
       .catch(() => setLogoUrl(null));
+
+    // Fetch branding settings
+    fetch('/api/branding/settings')
+      .then((resp) => resp.json())
+      .then((data) => setFooterText(data.footer_text || ''))
+      .catch(() => setFooterText(''));
   }, [refresh]);
 
   const uploadProps: UploadProps = {
@@ -88,6 +96,20 @@ export default function Branding() {
       .catch(() => message.error('Erreur lors du téléchargement'));
   };
 
+  const handleSaveFooter = async () => {
+    setSavingFooter(true);
+    try {
+      await api.put('/branding/settings', { footer_text: footerText });
+      message.success('Texte du bas de page enregistré');
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || 'Erreur lors de la sauvegarde');
+    } finally {
+      setSavingFooter(false);
+    }
+  };
+
+  const footerPreview = `${footerText || 'Qualys2Human'} - NeoRed - 2026/${new Date().getFullYear()}`;
+
   return (
     <div>
       <Card title="Logo de l'application">
@@ -122,6 +144,39 @@ export default function Branding() {
           <Paragraph type="secondary" style={{ marginTop: 16 }}>
             Formats acceptés : SVG, PNG, JPG (max 500 Ko). Taille recommandée : 200x50 pixels.
           </Paragraph>
+        </Space>
+      </Card>
+
+      <Card title="Bas de page" style={{ marginTop: 16 }}>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <div>
+            <Text strong>Texte personnalisé</Text>
+            <Input
+              value={footerText}
+              onChange={(e) => setFooterText(e.target.value)}
+              placeholder="Qualys2Human"
+              style={{ marginTop: 8 }}
+            />
+            <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+              Ce texte apparaîtra dans le bas de page. Laissez vide pour afficher « Qualys2Human ».
+            </Paragraph>
+          </div>
+
+          <div style={{ padding: '12px 16px', background: '#fafafa', borderRadius: 8, textAlign: 'center' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Aperçu :</Text>
+            <div style={{ marginTop: 4 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>{footerPreview}</Text>
+            </div>
+          </div>
+
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={handleSaveFooter}
+            loading={savingFooter}
+          >
+            Enregistrer
+          </Button>
         </Space>
       </Card>
     </div>

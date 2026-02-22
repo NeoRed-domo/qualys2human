@@ -9,4 +9,16 @@ build/
 keys/
 certs/
 data/branding/logo-custom.*
+data/branding/settings.json
 *.db
+
+# Prerequisites (large binaries — download separately)
+prerequisites/*.exe
+
+# Dev/temp files
+.pids/
+.claude/
+dev/
+*.jpg
+exemple-qualys-raw.csv
+Description_projet.txt

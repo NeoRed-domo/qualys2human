@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Row, Col, Checkbox, Select, DatePicker, Button, Card } from 'antd';
 import { ClearOutlined } from '@ant-design/icons';
 import { useFilters } from '../../contexts/FilterContext';
 import PresetSelector from './PresetSelector';
+import api from '../../api/client';
 import dayjs from 'dayjs';
 
 const SEVERITY_OPTIONS = [
@@ -13,16 +15,34 @@ const SEVERITY_OPTIONS = [
 ];
 
 const TYPE_OPTIONS = [
-  { label: 'Vulnerability', value: 'Vulnerability' },
-  { label: 'Practice', value: 'Practice' },
-  { label: 'Information Gathered', value: 'Information Gathered' },
+  { label: 'Vulnérabilité', value: 'Vuln' },
+  { label: 'Pratique', value: 'Practice' },
+  { label: 'Information', value: 'Ig' },
 ];
 
-export default function FilterBar() {
+interface LayerOption {
+  label: string;
+  value: number;
+}
+
+interface FilterBarProps {
+  extra?: React.ReactNode;
+}
+
+export default function FilterBar({ extra }: FilterBarProps) {
   const {
-    severities, types, dateFrom, dateTo,
-    setSeverities, setTypes, setDateFrom, setDateTo, resetFilters,
+    severities, types, layers, dateFrom, dateTo,
+    setSeverities, setTypes, setLayers, setDateFrom, setDateTo, resetFilters,
   } = useFilters();
+  const [layerOptions, setLayerOptions] = useState<LayerOption[]>([]);
+
+  useEffect(() => {
+    api.get('/layers').then((resp) => {
+      setLayerOptions(
+        resp.data.map((l: { id: number; name: string }) => ({ label: l.name, value: l.id }))
+      );
+    }).catch(() => {});
+  }, []);
 
   return (
     <Card size="small" style={{ marginBottom: 16 }}>
@@ -36,7 +56,7 @@ export default function FilterBar() {
           />
         </Col>
 
-        <Col xs={24} md={6}>
+        <Col xs={24} md={5}>
           <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>Type</div>
           <Select
             mode="multiple"
@@ -45,6 +65,19 @@ export default function FilterBar() {
             options={TYPE_OPTIONS}
             value={types}
             onChange={setTypes}
+            allowClear
+          />
+        </Col>
+
+        <Col xs={24} md={4}>
+          <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>Catégorisation</div>
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="Toutes"
+            options={[...layerOptions, { label: 'Autre', value: 0 }]}
+            value={layers}
+            onChange={setLayers}
             allowClear
           />
         </Col>
@@ -76,6 +109,12 @@ export default function FilterBar() {
           <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>&nbsp;</div>
           <PresetSelector />
         </Col>
+
+        {extra && (
+          <Col flex="auto" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
+            {extra}
+          </Col>
+        )}
       </Row>
     </Card>
   );
