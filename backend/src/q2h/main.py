@@ -8,6 +8,7 @@ from q2h.api.vulnerabilities import router as vuln_router
 from q2h.api.hosts import router as hosts_router
 from q2h.api.presets import router as presets_router
 from q2h.api.trends import router as trends_router
+from q2h.api.export import router as export_router
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ app.include_router(vuln_router)
 app.include_router(hosts_router)
 app.include_router(presets_router)
 app.include_router(trends_router)
+app.include_router(export_router)
 
 
 @app.get("/api/health")
