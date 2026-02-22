@@ -5,6 +5,7 @@ import api from '../api/client';
 import TrendBuilder, { type TrendQueryParams } from '../components/trends/TrendBuilder';
 import TrendChart from '../components/trends/TrendChart';
 import ExportButtons from '../components/ExportButtons';
+import HelpTooltip from '../components/help/HelpTooltip';
 
 interface DataPoint {
   date: string;
@@ -57,7 +58,8 @@ export default function Trends() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <HelpTooltip topic="trends" />
         <ExportButtons queryString="view=overview" />
       </div>
       <TrendBuilder onQuery={runQuery} loading={loading} />

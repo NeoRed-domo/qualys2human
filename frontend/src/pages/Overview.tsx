@@ -11,6 +11,7 @@ import TopVulnsTable from '../components/dashboard/TopVulnsTable';
 import TopHostsTable from '../components/dashboard/TopHostsTable';
 import ExportButtons from '../components/ExportButtons';
 import WidgetGrid, { type WidgetDef } from '../components/dashboard/WidgetGrid';
+import HelpTooltip from '../components/help/HelpTooltip';
 
 interface OverviewData {
   total_vulns: number;
@@ -100,7 +101,10 @@ export default function Overview() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <FilterBar />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FilterBar />
+          <HelpTooltip topic="overview" />
+        </div>
         <ExportButtons queryString={exportQs} />
       </div>
 

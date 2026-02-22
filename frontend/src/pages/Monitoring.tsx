@@ -11,6 +11,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import api from '../api/client';
+import HelpTooltip from '../components/help/HelpTooltip';
 
 const { Text } = Typography;
 
@@ -118,9 +119,12 @@ export default function Monitoring() {
         <Text type="secondary">
           <ClockCircleOutlined /> Uptime : {formatUptime(data.uptime_seconds)} | {data.platform} | Python {data.python_version}
         </Text>
-        <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
-          Actualiser
-        </Button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <HelpTooltip topic="monitoring" />
+          <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Alerts */}
