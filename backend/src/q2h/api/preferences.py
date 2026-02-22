@@ -1,0 +1,84 @@
+"""User preferences API — dashboard layout and personal settings."""
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from q2h.auth.dependencies import get_current_user
+from q2h.db.engine import get_db
+from q2h.db.models import User
+
+router = APIRouter(prefix="/api/user/preferences", tags=["preferences"])
+
+
+class PreferencesResponse(BaseModel):
+    layout: list | None = None
+    settings: dict | None = None
+
+
+class PreferencesUpdate(BaseModel):
+    layout: list | None = None
+    settings: dict | None = None
+
+
+@router.get("", response_model=PreferencesResponse)
+async def get_preferences(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Get current user's preferences."""
+    user_id = int(user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    u = result.scalar_one()
+    prefs = u.preferences or {}
+    return PreferencesResponse(
+        layout=prefs.get("layout"),
+        settings=prefs.get("settings"),
+    )
+
+
+@router.put("", response_model=PreferencesResponse)
+async def update_preferences(
+    body: PreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Save user preferences (layout and/or settings)."""
+    user_id = int(user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    u = result.scalar_one()
+    prefs = dict(u.preferences or {})
+
+    if body.layout is not None:
+        prefs["layout"] = body.layout
+    if body.settings is not None:
+        prefs["settings"] = body.settings
+
+    u.preferences = prefs
+    await db.commit()
+
+    return PreferencesResponse(
+        layout=prefs.get("layout"),
+        settings=prefs.get("settings"),
+    )
+
+
+@router.delete("/layout", response_model=PreferencesResponse)
+async def reset_layout(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Reset dashboard layout to default."""
+    user_id = int(user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    u = result.scalar_one()
+    prefs = dict(u.preferences or {})
+    prefs.pop("layout", None)
+    u.preferences = prefs
+    await db.commit()
+
+    return PreferencesResponse(
+        layout=None,
+        settings=prefs.get("settings"),
+    )

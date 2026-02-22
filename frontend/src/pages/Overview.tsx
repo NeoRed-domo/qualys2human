@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Spin, Alert } from 'antd';
+import { Spin, Alert } from 'antd';
 import api from '../api/client';
 import { useFilters } from '../contexts/FilterContext';
 import FilterBar from '../components/filters/FilterBar';
@@ -10,6 +10,7 @@ import CategoryBar from '../components/dashboard/CategoryBar';
 import TopVulnsTable from '../components/dashboard/TopVulnsTable';
 import TopHostsTable from '../components/dashboard/TopHostsTable';
 import ExportButtons from '../components/ExportButtons';
+import WidgetGrid, { type WidgetDef } from '../components/dashboard/WidgetGrid';
 
 interface OverviewData {
   total_vulns: number;
@@ -54,6 +55,48 @@ export default function Overview() {
 
   const exportQs = `view=overview${toQueryString() ? '&' + toQueryString() : ''}`;
 
+  const widgets: WidgetDef[] = data
+    ? [
+        {
+          key: 'kpi',
+          label: 'Indicateurs clés',
+          content: (
+            <KPICards
+              totalVulns={data.total_vulns}
+              hostCount={data.host_count}
+              criticalCount={data.critical_count}
+              coherenceOk={data.coherence_checks.length === 0}
+            />
+          ),
+        },
+        {
+          key: 'severity',
+          label: 'Répartition par sévérité',
+          content: <SeverityDonut data={data.severity_distribution} />,
+        },
+        {
+          key: 'category',
+          label: 'Top vulnérabilités (graphique)',
+          content: (
+            <CategoryBar
+              data={data.top_vulns}
+              onClickBar={(qid) => navigate(`/vulnerabilities/${qid}`)}
+            />
+          ),
+        },
+        {
+          key: 'topVulns',
+          label: 'Top vulnérabilités (tableau)',
+          content: <TopVulnsTable data={data.top_vulns} />,
+        },
+        {
+          key: 'topHosts',
+          label: 'Top serveurs',
+          content: <TopHostsTable data={data.top_hosts} />,
+        },
+      ]
+    : [];
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -62,37 +105,7 @@ export default function Overview() {
       </div>
 
       <Spin spinning={loading}>
-        {data && (
-          <>
-            <KPICards
-              totalVulns={data.total_vulns}
-              hostCount={data.host_count}
-              criticalCount={data.critical_count}
-              coherenceOk={data.coherence_checks.length === 0}
-            />
-
-            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-              <Col xs={24} lg={12}>
-                <SeverityDonut data={data.severity_distribution} />
-              </Col>
-              <Col xs={24} lg={12}>
-                <CategoryBar
-                  data={data.top_vulns}
-                  onClickBar={(qid) => navigate(`/vulnerabilities/${qid}`)}
-                />
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-              <Col xs={24} lg={12}>
-                <TopVulnsTable data={data.top_vulns} />
-              </Col>
-              <Col xs={24} lg={12}>
-                <TopHostsTable data={data.top_hosts} />
-              </Col>
-            </Row>
-          </>
-        )}
+        {data && <WidgetGrid widgets={widgets} />}
       </Spin>
     </div>
   );
