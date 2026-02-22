@@ -1,4 +1,5 @@
 import csv
+import io
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -35,11 +36,13 @@ class QualysCSVParser:
         self._load_lines()
 
     def _load_lines(self):
+        self._encoding = "utf-8"
         encodings = ["utf-8", "latin-1", "cp1252"]
         for enc in encodings:
             try:
                 with open(self.filepath, encoding=enc) as f:
                     self._raw_lines = f.readlines()
+                self._encoding = enc
                 return
             except UnicodeDecodeError:
                 continue
@@ -122,14 +125,13 @@ class QualysCSVParser:
                 return j
         raise ValueError("Cannot find detail vulnerability section in CSV")
 
-    def parse_detail_rows(self) -> pl.LazyFrame:
-        """Parse the detail vulnerability rows using Polars for performance."""
+    def parse_detail_rows(self) -> pl.DataFrame:
+        """Parse the detail vulnerability rows using Python csv (handles complex quoting)."""
         if self._detail_start_line < 0:
             self.find_detail_section_start()
-        return pl.scan_csv(
-            self.filepath,
-            skip_rows=self._detail_start_line,
-            has_header=True,
-            infer_schema_length=0,  # Read all as strings initially
-            encoding="utf8-lossy",
-        )
+        detail_text = "".join(self._raw_lines[self._detail_start_line:])
+        reader = csv.DictReader(io.StringIO(detail_text))
+        rows = [row for row in reader if row.get("IP")]
+        if not rows:
+            return pl.DataFrame()
+        return pl.DataFrame(rows)
