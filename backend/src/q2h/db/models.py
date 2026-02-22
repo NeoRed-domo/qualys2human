@@ -160,3 +160,24 @@ class AuditLog(Base):
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class EnterprisePreset(Base):
+    __tablename__ = "enterprise_presets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), default="default")
+    severities: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
+    types: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class UserPreset(Base):
+    __tablename__ = "user_presets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    severities: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
+    types: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
