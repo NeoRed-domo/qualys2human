@@ -181,3 +181,24 @@ class UserPreset(Base):
     severities: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
     types: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class TrendConfig(Base):
+    __tablename__ = "trend_configs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    max_window_days: Mapped[int] = mapped_column(Integer, default=365)
+    query_timeout_seconds: Mapped[int] = mapped_column(Integer, default=30)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class TrendTemplate(Base):
+    __tablename__ = "trend_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    metric: Mapped[str] = mapped_column(String(50))  # total_vulns, critical_count, host_count
+    group_by: Mapped[str | None] = mapped_column(String(50), nullable=True)  # severity, category, type
+    filters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
