@@ -57,21 +57,39 @@ def prepare_python(output: Path):
     if dst.exists():
         shutil.rmtree(dst)
 
-    # Find the embedded Python zip
-    embed_dir = PREREQS_DIR / "python-embed"
-    embed_zips = list(embed_dir.glob("python-*.zip")) if embed_dir.exists() else []
+    # Find the embedded Python — either a .zip or an already-extracted directory
+    embed_dir = None
+    embed_zip = None
 
-    if not embed_zips:
-        print("  WARNING: No embedded Python zip found in prerequisites/python-embed/")
-        print("  Download from: https://www.python.org/ftp/python/3.12.x/python-3.12.x-embed-amd64.zip")
+    # Option 1: already-extracted directory (e.g. prerequisites/python-3.12-embed-amd64/)
+    for candidate in sorted(PREREQS_DIR.glob("python-*-embed-*")):
+        if candidate.is_dir() and (candidate / "python.exe").exists():
+            embed_dir = candidate
+            break
+
+    # Option 2: zip file in prerequisites/python-embed/
+    if not embed_dir:
+        zip_dir = PREREQS_DIR / "python-embed"
+        if zip_dir.exists():
+            zips = list(zip_dir.glob("python-*.zip"))
+            if zips:
+                embed_zip = zips[0]
+
+    if not embed_dir and not embed_zip:
+        print("  WARNING: No embedded Python found in prerequisites/")
+        print("  Either place the extracted folder (python-3.12-embed-amd64/)")
+        print("  or a .zip in prerequisites/python-embed/")
         print("  Falling back to venv-based build...")
         _fallback_venv(output)
         return
 
-    embed_zip = embed_zips[0]
-    print(f"  Extracting {embed_zip.name}...")
-    with zipfile.ZipFile(embed_zip, "r") as zf:
-        zf.extractall(dst)
+    if embed_dir:
+        print(f"  Copying {embed_dir.name}...")
+        shutil.copytree(embed_dir, dst)
+    else:
+        print(f"  Extracting {embed_zip.name}...")
+        with zipfile.ZipFile(embed_zip, "r") as zf:
+            zf.extractall(dst)
 
     # Enable pip in embedded Python by editing python312._pth
     pth_files = list(dst.glob("python*._pth"))

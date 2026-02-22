@@ -54,7 +54,7 @@ export default function Login() {
             <img
               src={logoUrl}
               alt="Logo"
-              style={{ maxHeight: 60, maxWidth: 300, marginBottom: 8 }}
+              style={{ maxHeight: 120, maxWidth: 360, marginBottom: 8 }}
               onError={() => setLogoError(true)}
             />
           ) : (
