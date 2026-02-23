@@ -2,14 +2,40 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, case, or_
+from sqlalchemy import select, func, case, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user
 from q2h.db.engine import get_db
-from q2h.db.models import LatestVuln, Host, ReportCoherenceCheck, VulnLayer
+from q2h.db.models import LatestVuln, Host, ReportCoherenceCheck, VulnLayer, AppSettings
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+
+async def _get_freshness_thresholds(db: AsyncSession) -> dict:
+    """Fetch admin-configurable freshness thresholds from app_settings."""
+    stale = (await db.execute(
+        select(AppSettings.value).where(AppSettings.key == "freshness_stale_days")
+    )).scalar() or "7"
+    hide = (await db.execute(
+        select(AppSettings.value).where(AppSettings.key == "freshness_hide_days")
+    )).scalar() or "30"
+    return {"stale_days": int(stale), "hide_days": int(hide)}
+
+
+def _apply_freshness(stmt, freshness_val: str, thresholds: dict):
+    """Apply freshness filter to a LatestVuln query."""
+    if freshness_val == "all":
+        return stmt
+    if freshness_val == "stale":
+        return stmt.where(
+            LatestVuln.last_detected < func.now() - text(f"interval '{thresholds['stale_days']} days'"),
+            LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['hide_days']} days'"),
+        )
+    # Default: active only
+    return stmt.where(
+        LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['stale_days']} days'")
+    )
 
 
 class SeverityCount(BaseModel):
@@ -54,6 +80,8 @@ class OverviewResponse(BaseModel):
     top_hosts: list[TopHost]
     coherence_checks: list[CoherenceItem]
     layer_distribution: list[LayerCount]
+    freshness_stale_days: int = 7
+    freshness_hide_days: int = 30
 
 
 def _apply_filters(stmt, severities, date_from, date_to, report_id, types, layers=None, os_classes=None, host_joined=False):
@@ -119,22 +147,27 @@ async def dashboard_overview(
     types: Optional[str] = Query(None, description="Comma-separated vuln types"),
     layers: Optional[str] = Query(None, description="Comma-separated layer IDs"),
     os_classes: Optional[str] = Query(None, description="Comma-separated OS classes: windows,nix"),
+    freshness: Optional[str] = Query("active", description="Freshness: active, stale, all"),
 ):
     fargs = (severities, date_from, date_to, report_id, types, layers, os_classes)
+    thresholds = await _get_freshness_thresholds(db)
 
     # --- Total vulns ---
     total_q = select(func.count(LatestVuln.id))
     total_q = _apply_filters(total_q, *fargs)
+    total_q = _apply_freshness(total_q, freshness or "active", thresholds)
     total_vulns = (await db.execute(total_q)).scalar() or 0
 
     # --- Distinct host count ---
     host_q = select(func.count(func.distinct(LatestVuln.host_id)))
     host_q = _apply_filters(host_q, *fargs)
+    host_q = _apply_freshness(host_q, freshness or "active", thresholds)
     host_count = (await db.execute(host_q)).scalar() or 0
 
     # --- Critical count (severity 4 + 5) ---
     crit_q = select(func.count(LatestVuln.id)).where(LatestVuln.severity >= 4)
     crit_q = _apply_filters(crit_q, *fargs)
+    crit_q = _apply_freshness(crit_q, freshness or "active", thresholds)
     critical_count = (await db.execute(crit_q)).scalar() or 0
 
     # --- Severity distribution ---
@@ -144,6 +177,7 @@ async def dashboard_overview(
         .order_by(LatestVuln.severity.desc())
     )
     sev_q = _apply_filters(sev_q, *fargs)
+    sev_q = _apply_freshness(sev_q, freshness or "active", thresholds)
     sev_rows = (await db.execute(sev_q)).all()
     severity_distribution = [
         SeverityCount(severity=row.severity, count=row.count) for row in sev_rows
@@ -162,6 +196,7 @@ async def dashboard_overview(
         .limit(10)
     )
     top_v_q = _apply_filters(top_v_q, *fargs)
+    top_v_q = _apply_freshness(top_v_q, freshness or "active", thresholds)
     top_v_rows = (await db.execute(top_v_q)).all()
     top_vulns = [
         TopVuln(qid=r.qid, title=r.title, severity=r.severity, count=r.count)
@@ -182,6 +217,7 @@ async def dashboard_overview(
         .limit(10)
     )
     top_h_q = _apply_filters(top_h_q, *fargs, host_joined=True)
+    top_h_q = _apply_freshness(top_h_q, freshness or "active", thresholds)
     top_h_rows = (await db.execute(top_h_q)).all()
     top_hosts = [
         TopHost(ip=r.ip, dns=r.dns, os=r.os, host_count=r.host_count)
@@ -216,6 +252,7 @@ async def dashboard_overview(
         .group_by(VulnLayer.name, VulnLayer.color)
     )
     layer_q = _apply_filters(layer_q, *fargs)
+    layer_q = _apply_freshness(layer_q, freshness or "active", thresholds)
     layer_rows = (await db.execute(layer_q)).all()
     layer_distribution = [
         LayerCount(name=r.name, color=r.color, count=r.count)
@@ -231,4 +268,6 @@ async def dashboard_overview(
         top_hosts=top_hosts,
         coherence_checks=coherence_checks,
         layer_distribution=layer_distribution,
+        freshness_stale_days=thresholds["stale_days"],
+        freshness_hide_days=thresholds["hide_days"],
     )

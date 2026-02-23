@@ -5,6 +5,8 @@ interface FilterState {
   severities: number[];
   types: string[];
   layers: number[];
+  osClasses: string[];
+  freshness: string;
   dateFrom: string | null;
   dateTo: string | null;
   reportId: number | null;
@@ -14,6 +16,8 @@ interface FilterContextValue extends FilterState {
   setSeverities: (s: number[]) => void;
   setTypes: (t: string[]) => void;
   setLayers: (l: number[]) => void;
+  setOsClasses: (o: string[]) => void;
+  setFreshness: (f: string) => void;
   setDateFrom: (d: string | null) => void;
   setDateTo: (d: string | null) => void;
   setReportId: (id: number | null) => void;
@@ -28,6 +32,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [severities, setSeverities] = useState<number[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [layers, setLayers] = useState<number[]>([]);
+  const [osClasses, setOsClasses] = useState<string[]>([]);
+  const [freshness, setFreshness] = useState<string>('active');
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
   const [reportId, setReportId] = useState<number | null>(null);
@@ -66,6 +72,8 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setSeverities(enterpriseDefaults.current.severities);
     setTypes(enterpriseDefaults.current.types);
     setLayers(enterpriseDefaults.current.layers);
+    setOsClasses([]);
+    setFreshness('active');
     setDateFrom(null);
     setDateTo(null);
     setReportId(null);
@@ -76,17 +84,19 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     if (severities.length > 0) params.set('severities', severities.join(','));
     if (types.length > 0) params.set('types', types.join(','));
     if (layers.length > 0) params.set('layers', layers.join(','));
+    if (osClasses.length > 0) params.set('os_classes', osClasses.join(','));
+    if (freshness && freshness !== 'active') params.set('freshness', freshness);
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
     if (reportId) params.set('report_id', String(reportId));
     return params.toString();
-  }, [severities, types, layers, dateFrom, dateTo, reportId]);
+  }, [severities, types, layers, osClasses, freshness, dateFrom, dateTo, reportId]);
 
   return (
     <FilterContext.Provider
       value={{
-        severities, types, layers, dateFrom, dateTo, reportId,
-        setSeverities, setTypes, setLayers, setDateFrom, setDateTo, setReportId,
+        severities, types, layers, osClasses, freshness, dateFrom, dateTo, reportId,
+        setSeverities, setTypes, setLayers, setOsClasses, setFreshness, setDateFrom, setDateTo, setReportId,
         resetFilters, toQueryString, ready,
       }}
     >

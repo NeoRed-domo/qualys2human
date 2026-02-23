@@ -27,7 +27,7 @@ interface OverviewData {
 
 export default function Overview() {
   const navigate = useNavigate();
-  const { toQueryString, severities, types, layers, dateFrom, dateTo, reportId, ready } = useFilters();
+  const { toQueryString, severities, types, layers, osClasses, freshness, dateFrom, dateTo, reportId, ready } = useFilters();
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function Overview() {
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [severities, types, layers, dateFrom, dateTo, reportId, toQueryString, ready]);
+  }, [severities, types, layers, osClasses, freshness, dateFrom, dateTo, reportId, toQueryString, ready]);
 
   if (error) {
     return <Alert message="Erreur" description={error} type="error" showIcon />;

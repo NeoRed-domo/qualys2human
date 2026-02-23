@@ -20,6 +20,11 @@ const TYPE_OPTIONS = [
   { label: 'Information', value: 'Ig' },
 ];
 
+const OS_CLASS_OPTIONS = [
+  { label: 'Windows', value: 'windows' },
+  { label: 'NIX (Linux/Unix)', value: 'nix' },
+];
+
 interface LayerOption {
   label: string;
   value: number;
@@ -31,8 +36,8 @@ interface FilterBarProps {
 
 export default function FilterBar({ extra }: FilterBarProps) {
   const {
-    severities, types, layers, dateFrom, dateTo,
-    setSeverities, setTypes, setLayers, setDateFrom, setDateTo, resetFilters,
+    severities, types, layers, osClasses, freshness, dateFrom, dateTo,
+    setSeverities, setTypes, setLayers, setOsClasses, setFreshness, setDateFrom, setDateTo, resetFilters,
   } = useFilters();
   const [layerOptions, setLayerOptions] = useState<LayerOption[]>([]);
 
@@ -79,6 +84,33 @@ export default function FilterBar({ extra }: FilterBarProps) {
             value={layers}
             onChange={setLayers}
             allowClear
+          />
+        </Col>
+
+        <Col xs={24} md={3}>
+          <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>Classe OS</div>
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="Tous"
+            options={OS_CLASS_OPTIONS}
+            value={osClasses}
+            onChange={setOsClasses}
+            allowClear
+          />
+        </Col>
+
+        <Col xs={24} md={2}>
+          <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>Fraîcheur</div>
+          <Select
+            style={{ width: '100%' }}
+            value={freshness}
+            onChange={setFreshness}
+            options={[
+              { label: 'Actives', value: 'active' },
+              { label: 'Peut-être obsolètes', value: 'stale' },
+              { label: 'Tout', value: 'all' },
+            ]}
           />
         </Col>
 
