@@ -23,6 +23,7 @@ WINSW_XML_TEMPLATE = """\
     <logpath>{log_dir}</logpath>
   </log>
   <env name="Q2H_CONFIG" value="{config_path}" />
+  <env name="PYTHONPATH" value="{src_dir}" />
 </service>
 """
 
@@ -32,6 +33,7 @@ def generate_xml(install_dir: Path, service_name: str = SERVICE_NAME,
     """Generate the WinSW XML configuration file."""
     python_exe = install_dir / "python" / "python.exe"
     working_dir = install_dir / "app" / "backend"
+    src_dir = install_dir / "app" / "backend" / "src"
     log_dir = install_dir / "logs"
     config_path = install_dir / "config.yaml"
 
@@ -42,6 +44,7 @@ def generate_xml(install_dir: Path, service_name: str = SERVICE_NAME,
         service_name=service_name,
         python_exe=python_exe,
         working_dir=working_dir,
+        src_dir=src_dir,
         log_dir=log_dir,
         config_path=config_path,
     )
@@ -55,8 +58,8 @@ def generate_xml(install_dir: Path, service_name: str = SERVICE_NAME,
 def _winsw(install_dir: Path, action: str, service_name: str = SERVICE_NAME,
            logger=None) -> bool:
     """Run a WinSW command."""
-    winsw = install_dir / "WinSW-x64.exe"
-    xml_path = install_dir / f"{service_name}.xml"
+    # WinSW exe is renamed to {service_name}.exe so it auto-discovers {service_name}.xml
+    winsw = install_dir / f"{service_name}.exe"
 
     if not winsw.exists():
         logger.error("WinSW non trouve: %s", winsw)
@@ -64,7 +67,7 @@ def _winsw(install_dir: Path, action: str, service_name: str = SERVICE_NAME,
 
     try:
         result = subprocess.run(
-            [str(winsw), action, str(xml_path)],
+            [str(winsw), action],
             capture_output=True, text=True, timeout=60,
         )
         if result.returncode != 0:

@@ -2,12 +2,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user
 from q2h.db.engine import get_db
-from q2h.db.models import Vulnerability, Host, ReportCoherenceCheck
+from q2h.db.models import Vulnerability, Host, ReportCoherenceCheck, VulnLayer
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -39,6 +39,12 @@ class CoherenceItem(BaseModel):
     severity: str
 
 
+class LayerCount(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+    count: int
+
+
 class OverviewResponse(BaseModel):
     total_vulns: int
     host_count: int
@@ -47,9 +53,10 @@ class OverviewResponse(BaseModel):
     top_vulns: list[TopVuln]
     top_hosts: list[TopHost]
     coherence_checks: list[CoherenceItem]
+    layer_distribution: list[LayerCount]
 
 
-def _apply_filters(stmt, severities, date_from, date_to, report_id, types):
+def _apply_filters(stmt, severities, date_from, date_to, report_id, types, layers=None):
     """Apply common filters to a Vulnerability query."""
     if severities:
         sev_list = [int(s.strip()) for s in severities.split(",")]
@@ -63,6 +70,17 @@ def _apply_filters(stmt, severities, date_from, date_to, report_id, types):
     if types:
         type_list = [t.strip() for t in types.split(",")]
         stmt = stmt.where(Vulnerability.type.in_(type_list))
+    if layers:
+        layer_list = [int(l.strip()) for l in layers.split(",")]
+        # 0 = "Autre" (unclassified, layer_id IS NULL)
+        if 0 in layer_list:
+            real_ids = [lid for lid in layer_list if lid != 0]
+            if real_ids:
+                stmt = stmt.where(or_(Vulnerability.layer_id.in_(real_ids), Vulnerability.layer_id.is_(None)))
+            else:
+                stmt = stmt.where(Vulnerability.layer_id.is_(None))
+        else:
+            stmt = stmt.where(Vulnerability.layer_id.in_(layer_list))
     return stmt
 
 
@@ -75,20 +93,21 @@ async def dashboard_overview(
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     report_id: Optional[int] = Query(None, description="Filter by scan report ID"),
     types: Optional[str] = Query(None, description="Comma-separated vuln types"),
+    layers: Optional[str] = Query(None, description="Comma-separated layer IDs"),
 ):
     # --- Total vulns ---
     total_q = select(func.count(Vulnerability.id))
-    total_q = _apply_filters(total_q, severities, date_from, date_to, report_id, types)
+    total_q = _apply_filters(total_q, severities, date_from, date_to, report_id, types, layers)
     total_vulns = (await db.execute(total_q)).scalar() or 0
 
     # --- Distinct host count ---
     host_q = select(func.count(func.distinct(Vulnerability.host_id)))
-    host_q = _apply_filters(host_q, severities, date_from, date_to, report_id, types)
+    host_q = _apply_filters(host_q, severities, date_from, date_to, report_id, types, layers)
     host_count = (await db.execute(host_q)).scalar() or 0
 
     # --- Critical count (severity 4 + 5) ---
     crit_q = select(func.count(Vulnerability.id)).where(Vulnerability.severity >= 4)
-    crit_q = _apply_filters(crit_q, severities, date_from, date_to, report_id, types)
+    crit_q = _apply_filters(crit_q, severities, date_from, date_to, report_id, types, layers)
     critical_count = (await db.execute(crit_q)).scalar() or 0
 
     # --- Severity distribution ---
@@ -97,7 +116,7 @@ async def dashboard_overview(
         .group_by(Vulnerability.severity)
         .order_by(Vulnerability.severity.desc())
     )
-    sev_q = _apply_filters(sev_q, severities, date_from, date_to, report_id, types)
+    sev_q = _apply_filters(sev_q, severities, date_from, date_to, report_id, types, layers)
     sev_rows = (await db.execute(sev_q)).all()
     severity_distribution = [
         SeverityCount(severity=row.severity, count=row.count) for row in sev_rows
@@ -115,7 +134,7 @@ async def dashboard_overview(
         .order_by(func.count(Vulnerability.id).desc())
         .limit(10)
     )
-    top_v_q = _apply_filters(top_v_q, severities, date_from, date_to, report_id, types)
+    top_v_q = _apply_filters(top_v_q, severities, date_from, date_to, report_id, types, layers)
     top_v_rows = (await db.execute(top_v_q)).all()
     top_vulns = [
         TopVuln(qid=r.qid, title=r.title, severity=r.severity, count=r.count)
@@ -135,7 +154,7 @@ async def dashboard_overview(
         .order_by(func.count(Vulnerability.id).desc())
         .limit(10)
     )
-    top_h_q = _apply_filters(top_h_q, severities, date_from, date_to, report_id, types)
+    top_h_q = _apply_filters(top_h_q, severities, date_from, date_to, report_id, types, layers)
     top_h_rows = (await db.execute(top_h_q)).all()
     top_hosts = [
         TopHost(ip=r.ip, dns=r.dns, os=r.os, host_count=r.host_count)
@@ -158,6 +177,24 @@ async def dashboard_overview(
         for c in coh_rows
     ]
 
+    # --- Layer distribution ---
+    layer_q = (
+        select(
+            VulnLayer.name,
+            VulnLayer.color,
+            func.count(Vulnerability.id).label("count"),
+        )
+        .select_from(Vulnerability)
+        .outerjoin(VulnLayer, Vulnerability.layer_id == VulnLayer.id)
+        .group_by(VulnLayer.name, VulnLayer.color)
+    )
+    layer_q = _apply_filters(layer_q, severities, date_from, date_to, report_id, types, layers)
+    layer_rows = (await db.execute(layer_q)).all()
+    layer_distribution = [
+        LayerCount(name=r.name, color=r.color, count=r.count)
+        for r in layer_rows
+    ]
+
     return OverviewResponse(
         total_vulns=total_vulns,
         host_count=host_count,
@@ -166,4 +203,5 @@ async def dashboard_overview(
         top_vulns=top_vulns,
         top_hosts=top_hosts,
         coherence_checks=coherence_checks,
+        layer_distribution=layer_distribution,
     )

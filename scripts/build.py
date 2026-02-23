@@ -20,7 +20,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).absolute().parent.parent
 BACKEND_DIR = ROOT / "backend"
 FRONTEND_DIR = ROOT / "frontend"
 DATA_DIR = ROOT / "data"
@@ -30,7 +30,8 @@ PREREQS_DIR = ROOT / "prerequisites"
 def run(cmd: list[str], cwd: Path | None = None, env=None):
     """Run a subprocess, printing output live."""
     print(f"  > {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=cwd, env=env)
+    # shell=True needed on Windows for commands like npm, npx (they are .cmd scripts)
+    result = subprocess.run(cmd, cwd=cwd, env=env, shell=(os.name == "nt"))
     if result.returncode != 0:
         print(f"  ERROR: Command failed with exit code {result.returncode}")
         sys.exit(1)
@@ -115,6 +116,10 @@ def prepare_python(output: Path):
         urllib.request.urlretrieve("https://bootstrap.pypa.io/get-pip.py", get_pip)
 
     run([str(python_exe), str(get_pip), "--no-warn-script-location"], cwd=dst)
+
+    # Install setuptools (needed to build backend from pyproject.toml)
+    print("  Installing setuptools...")
+    run([str(python_exe), "-m", "pip", "install", "setuptools", "--no-warn-script-location"])
 
     # Install backend dependencies into the embedded Python
     site_packages = dst / "Lib" / "site-packages"

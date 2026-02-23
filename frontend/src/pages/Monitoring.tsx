@@ -230,16 +230,18 @@ export default function Monitoring() {
                 <Statistic
                   title="Dernier import"
                   value={data.activity.last_import_filename || '—'}
-                  valueStyle={{ fontSize: 14 }}
+                  styles={{ content: { fontSize: 14 } }}
                 />
               </Col>
               <Col xs={12} sm={6}>
                 <Statistic
                   title="Statut dernier import"
                   value={data.activity.last_import_status || '—'}
-                  valueStyle={{
-                    fontSize: 14,
-                    color: data.activity.last_import_status === 'done' ? '#52c41a' : undefined,
+                  styles={{
+                    content: {
+                      fontSize: 14,
+                      color: data.activity.last_import_status === 'done' ? '#52c41a' : undefined,
+                    },
                   }}
                 />
               </Col>

@@ -6,6 +6,7 @@ import {
   ThunderboltOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 
 interface KPICardsProps {
@@ -49,7 +50,16 @@ export default function KPICards({
             title="Critiques (sev. 4-5)"
             value={criticalCount}
             prefix={<WarningOutlined />}
-            valueStyle={{ color: criticalCount > 0 ? '#cf1322' : '#3f8600' }}
+            styles={{ content: { color: criticalCount > 0 ? '#cf1322' : '#3f8600' } }}
+          />
+        </Card>
+      </Col>
+      <Col xs={24} sm={12} lg={6}>
+        <Card size="small">
+          <Statistic
+            title="Moy. vulns / serveur"
+            value={hostCount > 0 ? (totalVulns / hostCount).toFixed(1) : 0}
+            prefix={<BarChartOutlined />}
           />
         </Card>
       </Col>
@@ -59,7 +69,7 @@ export default function KPICards({
             title="Quick-wins"
             value={quickWinsCount}
             prefix={<ThunderboltOutlined />}
-            valueStyle={{ color: '#1677ff' }}
+            styles={{ content: { color: '#1677ff' } }}
           />
         </Card>
       </Col>

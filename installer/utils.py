@@ -62,9 +62,16 @@ def prompt_confirm(message: str, default: bool = True,
     return value in ("o", "oui", "y", "yes")
 
 
-def generate_password(length: int = 32) -> str:
-    """Generate a cryptographically secure random password."""
-    alphabet = string.ascii_letters + string.digits + "!@#$%&*"
+def generate_password(length: int = 32, safe: bool = False) -> str:
+    """Generate a cryptographically secure random password.
+
+    Args:
+        safe: If True, use only alphanumeric chars (safe for CLI arguments).
+    """
+    if safe:
+        alphabet = string.ascii_letters + string.digits
+    else:
+        alphabet = string.ascii_letters + string.digits + "!@#$%&*"
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 

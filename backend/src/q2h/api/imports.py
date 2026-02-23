@@ -1,16 +1,26 @@
 """Import management API — history, manual upload, progress."""
 
+import logging
 import tempfile
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.db.engine import get_db
-from q2h.db.models import ImportJob, ScanReport
-from q2h.auth.dependencies import get_current_user
+from q2h.db.models import (
+    ImportJob,
+    ScanReport,
+    Vulnerability,
+    ReportCoherenceCheck,
+    Host,
+)
+from q2h.auth.dependencies import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/imports", tags=["imports"])
 
@@ -147,6 +157,7 @@ async def upload_csv(
             rows_processed=importer.job.rows_processed,
         )
     except Exception as e:
+        logger.exception("Import failed for %s", file.filename)
         raise HTTPException(500, f"Import failed: {str(e)}")
     finally:
         # Clean up temp file
@@ -154,3 +165,62 @@ async def upload_csv(
             tmp_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+@router.delete("/reset-all", status_code=204)
+async def reset_all(
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_admin),
+):
+    """Delete ALL data: vulnerabilities, jobs, coherence checks, reports, hosts."""
+    await db.execute(delete(Vulnerability))
+    await db.execute(delete(ImportJob))
+    await db.execute(delete(ReportCoherenceCheck))
+    await db.execute(delete(ScanReport))
+    await db.execute(delete(Host))
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/report/{report_id}", status_code=204)
+async def delete_report(
+    report_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_admin),
+):
+    """Delete a single report and its associated data (vulns, jobs, checks).
+
+    Hosts are NOT deleted (shared across reports).
+    """
+    report = (
+        await db.execute(select(ScanReport).where(ScanReport.id == report_id))
+    ).scalar_one_or_none()
+    if not report:
+        raise HTTPException(404, "Report not found")
+
+    # Block deletion while import is in progress
+    active_job = (
+        await db.execute(
+            select(ImportJob).where(
+                ImportJob.scan_report_id == report_id,
+                ImportJob.status == "processing",
+            )
+        )
+    ).scalar_one_or_none()
+    if active_job:
+        raise HTTPException(409, "Cannot delete report while import is in progress")
+
+    await db.execute(
+        delete(Vulnerability).where(Vulnerability.scan_report_id == report_id)
+    )
+    await db.execute(
+        delete(ImportJob).where(ImportJob.scan_report_id == report_id)
+    )
+    await db.execute(
+        delete(ReportCoherenceCheck).where(
+            ReportCoherenceCheck.scan_report_id == report_id
+        )
+    )
+    await db.execute(delete(ScanReport).where(ScanReport.id == report_id))
+    await db.commit()
+    return Response(status_code=204)

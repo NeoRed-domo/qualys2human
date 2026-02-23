@@ -45,6 +45,27 @@ class Host(Base):
     vulnerabilities: Mapped[list["Vulnerability"]] = relationship(back_populates="host")
 
 
+class VulnLayer(Base):
+    __tablename__ = "vuln_layers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    color: Mapped[str] = mapped_column(String(7), default="#1677ff")
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class VulnLayerRule(Base):
+    __tablename__ = "vuln_layer_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    layer_id: Mapped[int] = mapped_column(ForeignKey("vuln_layers.id"), index=True)
+    match_field: Mapped[str] = mapped_column(String(20))  # "title" | "category"
+    pattern: Mapped[str] = mapped_column(Text)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+
+    layer: Mapped["VulnLayer"] = relationship()
+
+
 class Vulnerability(Base):
     __tablename__ = "vulnerabilities"
 
@@ -52,25 +73,25 @@ class Vulnerability(Base):
     scan_report_id: Mapped[int] = mapped_column(ForeignKey("scan_reports.id"), index=True)
     host_id: Mapped[int] = mapped_column(ForeignKey("hosts.id"), index=True)
     qid: Mapped[int] = mapped_column(Integer, index=True)
-    title: Mapped[str] = mapped_column(String(1000))
+    title: Mapped[str] = mapped_column(Text)
     vuln_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     severity: Mapped[int] = mapped_column(Integer, index=True)
     port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     protocol: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    fqdn: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    fqdn: Mapped[str | None] = mapped_column(Text, nullable=True)
     ssl: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     first_detected: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_detected: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     times_detected: Mapped[int | None] = mapped_column(Integer, nullable=True)
     date_last_fixed: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cve_ids: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
-    vendor_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    bugtraq_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    cvss_base: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    cvss_temporal: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    cvss3_base: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    cvss3_temporal: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    vendor_reference: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bugtraq_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cvss_base: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cvss_temporal: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cvss3_base: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cvss3_temporal: Mapped[str | None] = mapped_column(String(255), nullable=True)
     threat: Mapped[str | None] = mapped_column(Text, nullable=True)
     impact: Mapped[str | None] = mapped_column(Text, nullable=True)
     solution: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -78,10 +99,12 @@ class Vulnerability(Base):
     pci_vuln: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     ticket_state: Mapped[str | None] = mapped_column(String(50), nullable=True)
     tracking_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    category: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    layer_id: Mapped[int | None] = mapped_column(ForeignKey("vuln_layers.id"), nullable=True, index=True)
 
     scan_report: Mapped["ScanReport"] = relationship(back_populates="vulnerabilities")
     host: Mapped["Host"] = relationship(back_populates="vulnerabilities")
+    layer: Mapped["VulnLayer | None"] = relationship()
 
     __table_args__ = (
         Index("ix_vuln_report_severity", "scan_report_id", "severity"),
@@ -169,6 +192,7 @@ class EnterprisePreset(Base):
     name: Mapped[str] = mapped_column(String(255), default="default")
     severities: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
     types: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    layers: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -180,6 +204,7 @@ class UserPreset(Base):
     name: Mapped[str] = mapped_column(String(255))
     severities: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
     types: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    layers: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

@@ -40,7 +40,7 @@ async def seed_defaults(session: AsyncSession):
     result = await session.execute(
         select(User).join(Profile).where(Profile.name == "admin")
     )
-    if result.scalar_one_or_none() is None:
+    if result.scalars().first() is None:
         admin_profile = await session.execute(select(Profile).where(Profile.name == "admin"))
         profile = admin_profile.scalar_one()
         session.add(User(

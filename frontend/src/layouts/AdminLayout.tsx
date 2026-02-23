@@ -7,6 +7,7 @@ const ADMIN_TABS = [
   { key: '/admin/imports', label: 'Imports' },
   { key: '/admin/users', label: 'Utilisateurs' },
   { key: '/admin/rules', label: 'Règles entreprise' },
+  { key: '/admin/layers', label: 'Catégorisation' },
   { key: '/admin/branding', label: 'Branding' },
 ];
 
@@ -14,6 +15,7 @@ const TAB_HELP: Record<string, HelpTopic> = {
   '/admin/imports': 'admin-imports',
   '/admin/users': 'admin-users',
   '/admin/rules': 'admin-rules',
+  '/admin/layers': 'admin-rules',
   '/admin/branding': 'admin-branding',
 };
 

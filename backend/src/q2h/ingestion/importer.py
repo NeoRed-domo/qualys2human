@@ -5,7 +5,7 @@ import polars as pl
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from q2h.db.models import ScanReport, Host, Vulnerability, ImportJob, ReportCoherenceCheck
+from q2h.db.models import ScanReport, Host, Vulnerability, ImportJob, ReportCoherenceCheck, VulnLayerRule
 from q2h.ingestion.csv_parser import QualysCSVParser
 
 
@@ -48,6 +48,15 @@ class QualysImporter:
         self.parser.find_detail_section_start()
         df = self.parser.parse_detail_rows()
         self.job.rows_total = len(df)
+
+        # 4b. Load layer classification rules
+        rules_result = await self.session.execute(
+            select(VulnLayerRule).order_by(VulnLayerRule.priority.desc())
+        )
+        layer_rules = [
+            (r.match_field, r.pattern.lower(), r.layer_id)
+            for r in rules_result.scalars().all()
+        ]
 
         # 5. Upsert hosts and insert vulnerabilities
         host_cache: dict[str, Host] = {}
@@ -103,11 +112,21 @@ class QualysImporter:
                         continue
                 return None
 
+            # Classify by layer rules
+            title_val = row.get("Title", "") or ""
+            category_val = row.get("Category", "") or ""
+            matched_layer_id = None
+            for match_field, pattern_lower, lid in layer_rules:
+                value = title_val if match_field == "title" else category_val
+                if pattern_lower in value.lower():
+                    matched_layer_id = lid
+                    break
+
             vuln = Vulnerability(
                 scan_report_id=self.report.id,
                 host_id=host.id,
                 qid=qid,
-                title=row.get("Title", ""),
+                title=title_val,
                 vuln_status=row.get("Vuln Status"),
                 type=row.get("Type"),
                 severity=severity,
@@ -133,7 +152,8 @@ class QualysImporter:
                 pci_vuln=pci_val,
                 ticket_state=row.get("Ticket State"),
                 tracking_method=row.get("Tracking Method"),
-                category=row.get("Category"),
+                category=category_val,
+                layer_id=matched_layer_id,
             )
             self.session.add(vuln)
             rows_processed += 1

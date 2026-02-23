@@ -46,7 +46,7 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
           data={chartData}
           layout="vertical"
           margin={{ left: 20, right: 20, top: 5, bottom: 5 }}
-          onClick={(state) => {
+          onClick={(state: any) => {
             if (state?.activePayload?.[0]) {
               onClickBar?.(state.activePayload[0].payload.qid);
             }
@@ -57,7 +57,7 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
           <XAxis type="number" />
           <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 12 }} />
           <Tooltip
-            formatter={(value: number) => [value, 'Occurrences']}
+            formatter={(value: number | undefined) => [value ?? 0, 'Occurrences']}
             labelFormatter={(label) => {
               const item = chartData.find((d) => d.name === label);
               return item ? `QID ${item.qid} — ${label}` : label;

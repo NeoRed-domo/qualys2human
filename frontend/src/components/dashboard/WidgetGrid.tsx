@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Responsive, WidthProvider, type Layout } from 'react-grid-layout';
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import type { Layout } from 'react-grid-layout';
 import { Button, Tooltip } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import api from '../../api/client';
 import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -15,10 +17,10 @@ export interface WidgetDef {
 
 const DEFAULT_LAYOUT: Layout[] = [
   { i: 'kpi', x: 0, y: 0, w: 12, h: 3, isResizable: false },
-  { i: 'severity', x: 0, y: 3, w: 6, h: 5 },
-  { i: 'category', x: 6, y: 3, w: 6, h: 5 },
-  { i: 'topVulns', x: 0, y: 8, w: 6, h: 5 },
-  { i: 'topHosts', x: 6, y: 8, w: 6, h: 5 },
+  { i: 'severity', x: 0, y: 3, w: 6, h: 9 },
+  { i: 'category', x: 6, y: 3, w: 6, h: 9 },
+  { i: 'topVulns', x: 0, y: 12, w: 6, h: 10 },
+  { i: 'topHosts', x: 6, y: 12, w: 6, h: 10 },
 ];
 
 interface WidgetGridProps {
@@ -44,7 +46,6 @@ export default function WidgetGrid({ widgets }: WidgetGridProps) {
 
   const handleLayoutChange = useCallback((newLayout: Layout[]) => {
     setLayout(newLayout);
-    // Debounce save — save after drag ends
     api.put('/user/preferences', { layout: newLayout }).catch(() => {});
   }, []);
 
@@ -70,10 +71,13 @@ export default function WidgetGrid({ widgets }: WidgetGridProps) {
         layouts={{ lg: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
         cols={{ lg: 12, md: 12, sm: 6, xs: 1 }}
-        rowHeight={60}
+        rowHeight={40}
+        margin={[12, 4]}
         onLayoutChange={(current) => handleLayoutChange(current)}
         draggableHandle=".widget-drag-handle"
         isResizable={false}
+        compactType="vertical"
+        preventCollision={false}
       >
         {layout.map((item) => {
           const widget = widgetMap.get(item.i);
@@ -84,18 +88,19 @@ export default function WidgetGrid({ widgets }: WidgetGridProps) {
                 className="widget-drag-handle"
                 style={{
                   cursor: 'grab',
-                  padding: '2px 8px',
-                  fontSize: 11,
+                  padding: '4px 12px',
+                  fontSize: 12,
                   color: '#8c8c8c',
                   borderBottom: '1px solid #f0f0f0',
                   background: '#fafafa',
                   borderRadius: '8px 8px 0 0',
                   userSelect: 'none',
+                  fontWeight: 500,
                 }}
               >
                 &#9776; {widget.label}
               </div>
-              <div style={{ padding: 0, height: 'calc(100% - 24px)', overflow: 'auto' }}>
+              <div style={{ padding: 12, height: 'calc(100% - 30px)', overflow: 'visible' }}>
                 {widget.content}
               </div>
             </div>

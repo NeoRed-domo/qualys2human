@@ -48,13 +48,13 @@ export default function Login() {
         justifyContent: 'center',
         alignItems: 'center',
       }}>
-      <Card style={{ width: 400, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+      <Card style={{ width: 560, maxWidth: '90vw', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           {logoUrl && !logoError ? (
             <img
               src={logoUrl}
               alt="Logo"
-              style={{ maxHeight: 120, maxWidth: 360, marginBottom: 8 }}
+              style={{ maxHeight: 180, maxWidth: 540, marginBottom: 8 }}
               onError={() => setLogoError(true)}
             />
           ) : (

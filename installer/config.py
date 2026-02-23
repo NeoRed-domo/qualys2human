@@ -87,22 +87,33 @@ def create_master_key(install_dir: Path, logger=None) -> bool:
             class DATA_BLOB(ctypes.Structure):
                 _fields_ = [
                     ("cbData", ctypes.wintypes.DWORD),
-                    ("pbData", ctypes.POINTER(ctypes.c_byte)),
+                    ("pbData", ctypes.c_void_p),
                 ]
 
-            input_blob = DATA_BLOB()
-            input_blob.cbData = len(raw_key)
-            input_blob.pbData = (ctypes.c_byte * len(raw_key))(*raw_key)
+            _CryptProtectData = ctypes.windll.crypt32.CryptProtectData
+            _CryptProtectData.argtypes = [
+                ctypes.POINTER(DATA_BLOB),  # pDataIn
+                ctypes.c_wchar_p,           # szDataDescr
+                ctypes.POINTER(DATA_BLOB),  # pOptionalEntropy
+                ctypes.c_void_p,            # pvReserved
+                ctypes.c_void_p,            # pPromptStruct
+                ctypes.wintypes.DWORD,      # dwFlags
+                ctypes.POINTER(DATA_BLOB),  # pDataOut
+            ]
+            _CryptProtectData.restype = ctypes.wintypes.BOOL
+
+            buf = (ctypes.c_ubyte * len(raw_key))(*raw_key)
+            input_blob = DATA_BLOB(len(raw_key), ctypes.cast(buf, ctypes.c_void_p))
             output_blob = DATA_BLOB()
 
-            if ctypes.windll.crypt32.CryptProtectData(
-                ctypes.byref(input_blob), "Q2H Master Key", None, None, None, 0,
-                ctypes.byref(output_blob),
+            if _CryptProtectData(
+                ctypes.byref(input_blob), "Q2H Master Key",
+                None, None, None, 0, ctypes.byref(output_blob),
             ):
-                protected = bytes(
-                    (ctypes.c_byte * output_blob.cbData).from_address(output_blob.pbData)
+                protected = (ctypes.c_ubyte * output_blob.cbData).from_address(
+                    output_blob.pbData
                 )
-                key_file.write_bytes(protected)
+                key_file.write_bytes(bytes(protected))
                 ctypes.windll.kernel32.LocalFree(output_blob.pbData)
                 logger.info("[OK] Master key generee (DPAPI protegee)")
                 return True

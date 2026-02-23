@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).absolute().parent.parent
 VERSION = "1.0.0"
 
 
@@ -78,11 +78,19 @@ def create_archive(build_dir: Path, output_path: Path):
                     zf.write(fpath, arcname)
                     file_count += 1
 
-        # Add root-level batch entry points (wrappers that call installer/*.bat)
+        # Add root-level batch entry points (thin wrappers that call installer/*.bat)
+        # These must NOT be copies of installer/*.bat — the paths differ at root level.
+        wrapper_template = (
+            '@echo off\r\n'
+            'cd /d "%~dp0"\r\n'
+            'call "installer\\{bat}" %*\r\n'
+        )
         for bat_name in ["install.bat", "upgrade.bat", "uninstall.bat"]:
-            bat_src = installer_dir / bat_name
-            if bat_src.exists():
-                zf.write(bat_src, f"{archive_root}/{bat_name}")
+            zf.writestr(
+                f"{archive_root}/{bat_name}",
+                wrapper_template.format(bat=bat_name),
+            )
+            file_count += 1
 
         # Add VERSION file
         zf.writestr(f"{archive_root}/VERSION", VERSION)
@@ -116,11 +124,13 @@ def create_sfx(zip_path: Path, sfx_path: Path):
         print(f"  The .zip archive is still available at: {zip_path}")
         return
 
-    # Find the SFX module
+    # Find the SFX module (try installer variant first, then standard GUI)
     sfx_module = None
     for candidate in [
         Path(r"C:\Program Files\7-Zip\7zS2.sfx"),
         Path(r"C:\Program Files (x86)\7-Zip\7zS2.sfx"),
+        Path(r"C:\Program Files\7-Zip\7z.sfx"),
+        Path(r"C:\Program Files (x86)\7-Zip\7z.sfx"),
     ]:
         if candidate.exists():
             sfx_module = candidate

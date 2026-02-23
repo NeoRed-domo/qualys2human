@@ -1,5 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Card, Table, Tag, Button, Upload, message, Progress, Space, Typography } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Upload,
+  message,
+  Progress,
+  Space,
+  Typography,
+  Popconfirm,
+  Modal,
+  Input,
+  notification,
+} from 'antd';
 import {
   UploadOutlined,
   ReloadOutlined,
@@ -7,6 +21,8 @@ import {
   CloseCircleOutlined,
   SyncOutlined,
   ClockCircleOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
@@ -41,6 +57,8 @@ export default function ImportManager() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -92,12 +110,40 @@ export default function ImportManager() {
         onSuccess?.(data);
         fetchJobs();
       } catch (err: any) {
-        message.error(err.message || "Erreur lors de l'upload");
+        notification.error({
+          message: "Erreur d'import",
+          description: err.message || "Erreur lors de l'upload",
+          duration: 0,
+        });
         onError?.(err);
       } finally {
         setUploading(false);
       }
     },
+  };
+
+  const handleDeleteReport = async (reportId: number) => {
+    try {
+      await api.delete(`/imports/report/${reportId}`);
+      message.success('Rapport supprimé avec succès');
+      fetchJobs();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || 'Erreur lors de la suppression';
+      message.error(detail);
+    }
+  };
+
+  const handleResetAll = async () => {
+    try {
+      await api.delete('/imports/reset-all');
+      message.success('Base réinitialisée avec succès');
+      setResetModalOpen(false);
+      setResetConfirmText('');
+      fetchJobs();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || 'Erreur lors de la réinitialisation';
+      message.error(detail);
+    }
   };
 
   const columns: ColumnsType<ImportJob> = [
@@ -164,6 +210,27 @@ export default function ImportManager() {
       width: 170,
       render: (dt: string | null) => dt || '—',
     },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 80,
+      render: (_: any, record: ImportJob) => (
+        <Popconfirm
+          title="Supprimer ce rapport et toutes ses vulnérabilités associées ?"
+          onConfirm={() => handleDeleteReport(record.scan_report_id)}
+          okText="Supprimer"
+          okType="danger"
+          cancelText="Annuler"
+        >
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={record.status === 'processing'}
+          />
+        </Popconfirm>
+      ),
+    },
   ];
 
   return (
@@ -179,6 +246,13 @@ export default function ImportManager() {
             </Upload>
             <Button icon={<ReloadOutlined />} onClick={fetchJobs} loading={loading}>
               Actualiser
+            </Button>
+            <Button
+              danger
+              icon={<ExclamationCircleOutlined />}
+              onClick={() => setResetModalOpen(true)}
+            >
+              Réinitialiser toute la base
             </Button>
           </Space>
         }
@@ -198,6 +272,34 @@ export default function ImportManager() {
           }}
         />
       </Card>
+
+      <Modal
+        title="Réinitialiser toute la base"
+        open={resetModalOpen}
+        onCancel={() => {
+          setResetModalOpen(false);
+          setResetConfirmText('');
+        }}
+        okText="Réinitialiser"
+        okType="danger"
+        okButtonProps={{ disabled: resetConfirmText !== 'CONFIRMER' }}
+        onOk={handleResetAll}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text type="danger" strong>
+            Attention : cette action va supprimer TOUS les rapports, vulnérabilités et hôtes
+            importés. Cette action est irréversible.
+          </Text>
+          <Text>
+            Tapez <Text code>CONFIRMER</Text> pour valider :
+          </Text>
+          <Input
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            placeholder="CONFIRMER"
+          />
+        </Space>
+      </Modal>
     </div>
   );
 }

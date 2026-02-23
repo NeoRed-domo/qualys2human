@@ -16,21 +16,33 @@ const SEVERITY_OPTIONS = [
 const TYPE_OPTIONS = [
   { value: 'Vuln', label: 'Vulnérabilité' },
   { value: 'Practice', label: 'Pratique' },
-  { value: 'Info', label: 'Information' },
+  { value: 'Ig', label: 'Information' },
 ];
+
+interface LayerOption {
+  id: number;
+  name: string;
+}
 
 export default function EnterpriseRules() {
   const [severities, setSeverities] = useState<number[]>([1, 2, 3, 4, 5]);
   const [types, setTypes] = useState<string[]>([]);
+  const [layers, setLayers] = useState<number[]>([]);
+  const [layerOptions, setLayerOptions] = useState<LayerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const resp = await api.get('/presets/enterprise');
-        setSeverities(resp.data.severities);
-        setTypes(resp.data.types);
+        const [presetResp, layersResp] = await Promise.all([
+          api.get('/presets/enterprise'),
+          api.get('/layers'),
+        ]);
+        setSeverities(presetResp.data.severities);
+        setTypes(presetResp.data.types);
+        setLayers(presetResp.data.layers || []);
+        setLayerOptions(layersResp.data);
       } catch {
         message.error('Erreur lors du chargement');
       } finally {
@@ -43,7 +55,7 @@ export default function EnterpriseRules() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/presets/enterprise', { severities, types });
+      await api.put('/presets/enterprise', { severities, types, layers });
       message.success('Règles enregistrées');
     } catch (err: any) {
       message.error(err.response?.data?.detail || 'Erreur');
@@ -68,14 +80,14 @@ export default function EnterpriseRules() {
           Ces règles définissent les filtres par défaut appliqués à tous les utilisateurs.
         </Text>
 
-        <Divider orientation="left">Sévérités visibles</Divider>
+        <Divider titlePlacement="left">Sévérités visibles</Divider>
         <Checkbox.Group
           value={severities}
           onChange={(vals) => setSeverities(vals as number[])}
           options={SEVERITY_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
         />
 
-        <Divider orientation="left">Types de vulnérabilités</Divider>
+        <Divider titlePlacement="left">Types de vulnérabilités</Divider>
         <Checkbox.Group
           value={types}
           onChange={(vals) => setTypes(vals as string[])}
@@ -84,6 +96,18 @@ export default function EnterpriseRules() {
         {types.length === 0 && (
           <div style={{ marginTop: 8 }}>
             <Text type="secondary">Aucun filtre de type — tous les types sont affichés.</Text>
+          </div>
+        )}
+
+        <Divider titlePlacement="left">Catégorisations visibles</Divider>
+        <Checkbox.Group
+          value={layers}
+          onChange={(vals) => setLayers(vals as number[])}
+          options={layerOptions.map((l) => ({ label: l.name, value: l.id }))}
+        />
+        {layers.length === 0 && (
+          <div style={{ marginTop: 8 }}>
+            <Text type="secondary">Aucun filtre de catégorisation — toutes les catégorisations sont affichées.</Text>
           </div>
         )}
       </Card>

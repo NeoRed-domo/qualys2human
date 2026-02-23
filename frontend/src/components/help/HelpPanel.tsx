@@ -226,7 +226,7 @@ export default function HelpPanel({ topic, open, onClose }: HelpPanelProps) {
     <Drawer
       title={help?.title || 'Aide'}
       placement="right"
-      width={420}
+      size="large"
       open={open}
       onClose={onClose}
     >

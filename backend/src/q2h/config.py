@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+
 from pydantic_settings import BaseSettings
 import yaml
 
@@ -46,6 +48,10 @@ settings: Settings | None = None
 def get_settings() -> Settings:
     global settings
     if settings is None:
-        config_path = Path(__file__).parent.parent.parent / "config.yaml"
+        env_path = os.environ.get("Q2H_CONFIG")
+        if env_path:
+            config_path = Path(env_path)
+        else:
+            config_path = Path(__file__).parent.parent.parent / "config.yaml"
         settings = Settings.from_yaml(config_path)
     return settings

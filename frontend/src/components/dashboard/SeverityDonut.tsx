@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { Card } from 'antd';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -59,7 +58,7 @@ export default function SeverityDonut({ data, onClickSeverity }: SeverityDonutPr
               />
             ))}
           </Pie>
-          <Tooltip formatter={(value: number) => [value, 'Vulnérabilités']} />
+          <Tooltip formatter={(value: number | undefined) => [value ?? 0, 'Vulnérabilités']} />
           <Legend />
         </PieChart>
       </ResponsiveContainer>

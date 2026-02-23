@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from jose import JWTError
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,14 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     profile: str
     must_change_password: bool
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -57,4 +66,31 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         refresh_token=auth_service.create_refresh_token(user.id),
         profile=profile.name,
         must_change_password=user.must_change_password,
+    )
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+async def refresh_token(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Exchange a valid refresh token for a new access token."""
+    try:
+        payload = auth_service.decode_token(req.refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    user_id = int(payload["sub"])
+    result = await db.execute(
+        select(User).join(Profile).where(User.id == user_id, User.is_active == True)  # noqa: E712
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    profile_result = await db.execute(select(Profile).where(Profile.id == user.profile_id))
+    profile = profile_result.scalar_one()
+
+    return RefreshResponse(
+        access_token=auth_service.create_access_token(user.id, user.username, profile.name),
     )

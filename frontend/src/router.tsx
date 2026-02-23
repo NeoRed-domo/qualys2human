@@ -13,6 +13,7 @@ import ImportManager from './pages/admin/ImportManager';
 import UserManagement from './pages/admin/UserManagement';
 import EnterpriseRules from './pages/admin/EnterpriseRules';
 import Branding from './pages/admin/Branding';
+import LayerRules from './pages/admin/LayerRules';
 import Monitoring from './pages/Monitoring';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -50,6 +51,7 @@ export default function AppRouter() {
             <Route path="users" element={<UserManagement />} />
             <Route path="rules" element={<EnterpriseRules />} />
             <Route path="branding" element={<Branding />} />
+            <Route path="layers" element={<LayerRules />} />
           </Route>
           <Route path="monitoring" element={<Monitoring />} />
           <Route path="profile" element={<Placeholder title="Mon Profil" />} />

@@ -14,15 +14,57 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — handle 401
+// Track whether a refresh is already in progress to avoid concurrent refreshes
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) throw new Error('No refresh token');
+
+  const resp = await axios.post('/api/auth/refresh', { refresh_token: refreshToken });
+  const newAccessToken: string = resp.data.access_token;
+  localStorage.setItem('access_token', newAccessToken);
+  return newAccessToken;
+}
+
+// Response interceptor — try refresh on 401, then retry once
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Only attempt refresh once per request, and not on the refresh endpoint itself
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retried &&
+      !originalRequest.url?.includes('/auth/refresh') &&
+      !originalRequest.url?.includes('/auth/login')
+    ) {
+      originalRequest._retried = true;
+
+      try {
+        // Deduplicate concurrent refresh calls
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken().finally(() => {
+            refreshPromise = null;
+          });
+        }
+        const newToken = await refreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch {
+        // Refresh failed — force logout
+      }
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
+
     return Promise.reject(error);
   }
 );

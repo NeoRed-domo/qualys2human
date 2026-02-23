@@ -13,7 +13,7 @@ import urllib.request
 from pathlib import Path
 
 # Installer modules are in the same directory
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).absolute().parent))
 
 from utils import (
     banner, check_admin, generate_password, prompt, prompt_confirm,
@@ -24,7 +24,7 @@ import config as config_mod
 import database
 import service
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).absolute().parent
 PACKAGE_ROOT = SCRIPT_DIR.parent
 VERSION_FILE = PACKAGE_ROOT / "VERSION"
 
@@ -63,6 +63,20 @@ def copy_app_files(install_dir: Path, logger):
     if src_data.exists() and not dst_data.exists():
         shutil.copytree(src_data, dst_data)
         logger.info("  [OK] data/")
+
+    # Patch python312._pth to prepend app/backend/src so the source q2h package
+    # takes priority over the pip-installed one in Lib/site-packages.
+    # Embedded Python ignores PYTHONPATH — the ._pth file is the only way.
+    pth_files = list((install_dir / "python").glob("python*._pth"))
+    if pth_files:
+        pth = pth_files[0]
+        content = pth.read_text(encoding="utf-8")
+        src_rel = "..\\app\\backend\\src"
+        if src_rel not in content:
+            # Prepend before all other entries so source wins over site-packages
+            content = src_rel + "\n" + content
+            pth.write_text(content, encoding="utf-8")
+            logger.info("  [OK] %s patche: %s ajoute", pth.name, src_rel)
 
     logger.info("[OK] Fichiers copies")
 
@@ -134,13 +148,26 @@ def main():
 
     service_name = prompt("Nom du service Windows", "Qualys2Human", non_interactive=ni)
 
-    # Generate secure passwords (never shown to user)
-    pg_superpass = generate_password(32)
-    db_password = generate_password(32)
+    # Detect existing PostgreSQL before generating passwords
+    existing_pg = prereqs.is_postgresql_running()
+    if existing_pg and not ni:
+        print()
+        print("  PostgreSQL est deja installe sur cette machine.")
+        print("  Le mot de passe superuser (postgres) est necessaire pour creer")
+        print("  la base de donnees et le role applicatif.")
+        pg_superpass = prompt("Mot de passe PostgreSQL (superuser postgres)", password=True, non_interactive=ni)
+    else:
+        # Generate secure password for fresh PostgreSQL install
+        # safe=True (alphanumeric only) because it's passed as CLI argument
+        pg_superpass = generate_password(32, safe=True)
+
+    # safe=True: alphanumeric only — avoids SQL/YAML escaping issues
+    db_password = generate_password(32, safe=True)
 
     # --- Step 1: Prerequisites ---
     print("\n--- Etape 1/5 : Prerequis ---")
-    if not prereqs.run_all(install_dir, server_port, pg_superpass, logger=logger):
+    if not prereqs.run_all(install_dir, server_port, pg_superpass,
+                          service_name=service_name, logger=logger):
         logger.error("Prerequis non satisfaits. Installation annulee.")
         sys.exit(1)
 

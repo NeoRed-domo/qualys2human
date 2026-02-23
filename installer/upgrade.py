@@ -9,12 +9,12 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).absolute().parent))
 
 from utils import banner, check_admin, prompt, setup_logging
 import service as service_mod
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).absolute().parent
 PACKAGE_ROOT = SCRIPT_DIR.parent
 
 

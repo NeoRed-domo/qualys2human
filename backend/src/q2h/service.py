@@ -19,7 +19,11 @@ from q2h.config import get_settings
 
 def setup_logging():
     """Configure application logging."""
-    log_dir = Path(__file__).parent.parent.parent / "logs"
+    config_env = os.environ.get("Q2H_CONFIG")
+    if config_env:
+        log_dir = Path(config_env).parent / "logs"
+    else:
+        log_dir = Path(__file__).parent.parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
 
     logging.basicConfig(
@@ -54,6 +58,13 @@ def main():
     logger.info("  Host: %s", server.host)
     logger.info("  Port: %s", server.port)
 
+    # Resolve install root from Q2H_CONFIG or fallback to source tree
+    config_env = os.environ.get("Q2H_CONFIG")
+    if config_env:
+        install_root = Path(config_env).parent
+    else:
+        install_root = Path(__file__).parent.parent.parent
+
     # Build uvicorn config
     uvicorn_kwargs = {
         "app": "q2h.main:app",
@@ -63,20 +74,27 @@ def main():
         "access_log": True,
     }
 
-    # TLS
+    # TLS — resolve relative paths from install root (where config.yaml lives)
     cert_path = Path(server.tls_cert)
     key_path = Path(server.tls_key)
+    if not cert_path.is_absolute():
+        cert_path = install_root / cert_path
+    if not key_path.is_absolute():
+        key_path = install_root / key_path
     if cert_path.exists() and key_path.exists():
         uvicorn_kwargs["ssl_certfile"] = str(cert_path)
         uvicorn_kwargs["ssl_keyfile"] = str(key_path)
         logger.info("  TLS: enabled (%s)", cert_path)
     else:
         logger.warning("  TLS: disabled (certificate files not found)")
-        logger.warning("    Expected: %s and %s", server.tls_cert, server.tls_key)
+        logger.warning("    Expected: %s and %s", cert_path, key_path)
 
-    # Set working directory to backend root
-    backend_root = Path(__file__).parent.parent.parent
-    os.chdir(backend_root)
+    # Set working directory to backend root for Uvicorn module discovery
+    backend_root = install_root / "app" / "backend"
+    if backend_root.exists():
+        os.chdir(backend_root)
+    else:
+        os.chdir(Path(__file__).parent.parent.parent)
 
     logger.info("Starting Uvicorn server...")
     uvicorn.run(**uvicorn_kwargs)

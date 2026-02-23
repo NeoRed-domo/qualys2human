@@ -5,7 +5,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import api from '../api/client';
 import ExportButtons from '../components/ExportButtons';
 
-const { Paragraph, Text } = Typography;
+const { Paragraph } = Typography;
 
 const SEVERITY_TAG: Record<number, { color: string; label: string }> = {
   5: { color: 'red', label: 'Urgent (5)' },

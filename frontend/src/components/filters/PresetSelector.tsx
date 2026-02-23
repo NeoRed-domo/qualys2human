@@ -10,10 +10,11 @@ interface Preset {
   name: string;
   severities: number[];
   types: string[];
+  layers: number[];
 }
 
 export default function PresetSelector() {
-  const { setSeverities, setTypes } = useFilters();
+  const { setSeverities, setTypes, setLayers } = useFilters();
   const [presets, setPresets] = useState<Preset[]>([]);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function PresetSelector() {
   const applyPreset = (preset: Preset) => {
     setSeverities(preset.severities || []);
     setTypes(preset.types || []);
+    setLayers(preset.layers || []);
     message.success(`Filtre "${preset.name}" appliqué`);
   };
 

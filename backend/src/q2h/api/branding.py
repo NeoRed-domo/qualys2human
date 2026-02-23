@@ -1,6 +1,7 @@
 """Branding API — logo upload, retrieval, template download, and settings."""
 
 import json
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -11,7 +12,12 @@ from q2h.auth.dependencies import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/branding", tags=["branding"])
 
-BRANDING_DIR = Path(__file__).parent.parent.parent.parent.parent / "data" / "branding"
+# Resolve branding dir from Q2H_CONFIG (installed) or relative to source tree (dev)
+_config_env = os.environ.get("Q2H_CONFIG")
+if _config_env:
+    BRANDING_DIR = Path(_config_env).parent / "data" / "branding"
+else:
+    BRANDING_DIR = Path(__file__).parent.parent.parent.parent.parent / "data" / "branding"
 DEFAULT_LOGO = BRANDING_DIR / "logo-default.svg"
 CUSTOM_LOGO = BRANDING_DIR / "logo-custom"
 TEMPLATE = BRANDING_DIR / "logo-template.svg"

@@ -17,12 +17,14 @@ router = APIRouter(prefix="/api/presets", tags=["presets"])
 class EnterprisePresetResponse(BaseModel):
     severities: list[int]
     types: list[str]
+    layers: list[int]
     name: str
 
 
 class EnterprisePresetUpdate(BaseModel):
     severities: list[int]
     types: list[str]
+    layers: list[int] = []
     name: Optional[str] = "default"
 
 
@@ -31,12 +33,14 @@ class UserPresetResponse(BaseModel):
     name: str
     severities: list[int]
     types: list[str]
+    layers: list[int]
 
 
 class UserPresetCreate(BaseModel):
     name: str
     severities: list[int]
     types: list[str]
+    layers: list[int] = []
 
 
 # --- Enterprise presets (admin only for PUT) ---
@@ -51,11 +55,12 @@ async def get_enterprise_preset(
     if not preset:
         # Return defaults if none configured
         return EnterprisePresetResponse(
-            severities=[1, 2, 3, 4, 5], types=[], name="default"
+            severities=[1, 2, 3, 4, 5], types=[], layers=[], name="default"
         )
     return EnterprisePresetResponse(
         severities=preset.severities or [],
         types=preset.types or [],
+        layers=preset.layers or [],
         name=preset.name,
     )
 
@@ -71,18 +76,21 @@ async def update_enterprise_preset(
     if preset:
         preset.severities = body.severities
         preset.types = body.types
+        preset.layers = body.layers
         preset.name = body.name or preset.name
     else:
         preset = EnterprisePreset(
             name=body.name or "default",
             severities=body.severities,
             types=body.types,
+            layers=body.layers,
         )
         db.add(preset)
     await db.commit()
     return EnterprisePresetResponse(
         severities=preset.severities,
         types=preset.types,
+        layers=preset.layers or [],
         name=preset.name,
     )
 
@@ -101,7 +109,8 @@ async def list_user_presets(
     presets = result.scalars().all()
     return [
         UserPresetResponse(
-            id=p.id, name=p.name, severities=p.severities or [], types=p.types or []
+            id=p.id, name=p.name, severities=p.severities or [],
+            types=p.types or [], layers=p.layers or [],
         )
         for p in presets
     ]
@@ -119,6 +128,7 @@ async def create_user_preset(
         name=body.name,
         severities=body.severities,
         types=body.types,
+        layers=body.layers,
     )
     db.add(preset)
     await db.commit()
@@ -128,6 +138,7 @@ async def create_user_preset(
         name=preset.name,
         severities=preset.severities or [],
         types=preset.types or [],
+        layers=preset.layers or [],
     )
 
 

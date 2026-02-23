@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -16,7 +17,9 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-config.set_main_option("sqlalchemy.url", get_database_url())
+# Q2H_DATABASE_URL takes priority (set by installer to bypass config system)
+db_url = os.environ.get("Q2H_DATABASE_URL") or get_database_url()
+config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:
