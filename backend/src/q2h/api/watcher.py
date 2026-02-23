@@ -51,11 +51,13 @@ class WatcherStatusResponse(BaseModel):
 
 
 def _parse_ignore_before(value: str | None) -> datetime | None:
-    """Parse an ISO-8601 string to datetime, or None."""
+    """Parse an ISO-8601 string to naive datetime (no timezone), or None."""
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value)
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        # Strip timezone — DB column is TIMESTAMP WITHOUT TIME ZONE
+        return dt.replace(tzinfo=None)
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, f"Format ignore_before invalide (ISO-8601 attendu) : {exc}")
 
@@ -101,10 +103,10 @@ async def create_path(
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(require_admin),
 ):
-    # Validate path exists on filesystem
+    # Validate path format (don't block UNC paths that may need credentials)
     p = Path(body.path)
-    if not p.exists() or not p.is_dir():
-        raise HTTPException(400, f"Le répertoire n'existe pas : {body.path}")
+    path_accessible = p.exists() and p.is_dir()
+    # Allow saving even if path is not currently reachable (e.g. UNC with credentials)
 
     # Check uniqueness
     existing = await db.execute(select(WatchPath).where(WatchPath.path == body.path))
@@ -137,9 +139,6 @@ async def update_path(
         raise HTTPException(404, "Watch path not found")
 
     if body.path is not None:
-        p = Path(body.path)
-        if not p.exists() or not p.is_dir():
-            raise HTTPException(400, f"Le répertoire n'existe pas : {body.path}")
         wp.path = body.path
     if body.pattern is not None:
         wp.pattern = body.pattern
