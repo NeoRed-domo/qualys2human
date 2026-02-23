@@ -5,12 +5,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user
 from q2h.db.engine import get_db
-from q2h.db.models import Vulnerability, Host, ScanReport
+from q2h.db.models import LatestVuln, Host, ScanReport
 
 router = APIRouter(prefix="/api/export", tags=["export"])
 
@@ -22,6 +22,7 @@ async def _query_vulns(
     types: Optional[str] = None,
     ip: Optional[str] = None,
     qid: Optional[int] = None,
+    os_classes: Optional[str] = None,
 ) -> list:
     """Query vulnerabilities with optional filters, returning row dicts."""
     q = (
@@ -29,38 +30,54 @@ async def _query_vulns(
             Host.ip,
             Host.dns,
             Host.os,
-            Vulnerability.qid,
-            Vulnerability.title,
-            Vulnerability.severity,
-            Vulnerability.type,
-            Vulnerability.category,
-            Vulnerability.vuln_status,
-            Vulnerability.port,
-            Vulnerability.protocol,
-            Vulnerability.first_detected,
-            Vulnerability.last_detected,
-            Vulnerability.cvss_base,
-            Vulnerability.cvss3_base,
-            Vulnerability.tracking_method,
-            Vulnerability.threat,
-            Vulnerability.impact,
-            Vulnerability.solution,
+            LatestVuln.qid,
+            LatestVuln.title,
+            LatestVuln.severity,
+            LatestVuln.type,
+            LatestVuln.category,
+            LatestVuln.vuln_status,
+            LatestVuln.port,
+            LatestVuln.protocol,
+            LatestVuln.first_detected,
+            LatestVuln.last_detected,
+            LatestVuln.cvss_base,
+            LatestVuln.cvss3_base,
+            LatestVuln.tracking_method,
+            LatestVuln.threat,
+            LatestVuln.impact,
+            LatestVuln.solution,
         )
-        .join(Host, Vulnerability.host_id == Host.id)
+        .join(Host, LatestVuln.host_id == Host.id)
     )
     if severities:
         sev_list = [int(s.strip()) for s in severities.split(",")]
-        q = q.where(Vulnerability.severity.in_(sev_list))
+        q = q.where(LatestVuln.severity.in_(sev_list))
     if report_id:
-        q = q.where(Vulnerability.scan_report_id == report_id)
+        q = q.where(LatestVuln.scan_report_id == report_id)
     if types:
         type_list = [t.strip() for t in types.split(",")]
-        q = q.where(Vulnerability.type.in_(type_list))
+        q = q.where(LatestVuln.type.in_(type_list))
     if ip:
         q = q.where(Host.ip == ip)
     if qid:
-        q = q.where(Vulnerability.qid == qid)
-    q = q.order_by(Vulnerability.severity.desc(), Host.ip, Vulnerability.qid)
+        q = q.where(LatestVuln.qid == qid)
+    if os_classes:
+        cls_list = [c.strip().lower() for c in os_classes.split(",")]
+        conditions = []
+        if "windows" in cls_list:
+            conditions.append(Host.os.ilike("%windows%"))
+        if "nix" in cls_list:
+            conditions.append(or_(
+                Host.os.ilike("%linux%"), Host.os.ilike("%unix%"),
+                Host.os.ilike("%ubuntu%"), Host.os.ilike("%debian%"),
+                Host.os.ilike("%centos%"), Host.os.ilike("%red hat%"),
+                Host.os.ilike("%rhel%"), Host.os.ilike("%suse%"),
+                Host.os.ilike("%fedora%"), Host.os.ilike("%aix%"),
+                Host.os.ilike("%solaris%"), Host.os.ilike("%freebsd%"),
+            ))
+        if conditions:
+            q = q.where(or_(*conditions))
+    q = q.order_by(LatestVuln.severity.desc(), Host.ip, LatestVuln.qid)
 
     result = await db.execute(q)
     return result.all()
@@ -83,8 +100,9 @@ async def export_csv(
     types: Optional[str] = Query(None),
     ip: Optional[str] = Query(None),
     qid: Optional[int] = Query(None),
+    os_classes: Optional[str] = Query(None),
 ):
-    rows = await _query_vulns(db, severities, report_id, types, ip, qid)
+    rows = await _query_vulns(db, severities, report_id, types, ip, qid, os_classes)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -120,6 +138,7 @@ async def export_pdf(
     types: Optional[str] = Query(None),
     ip: Optional[str] = Query(None),
     qid: Optional[int] = Query(None),
+    os_classes: Optional[str] = Query(None),
 ):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -127,7 +146,7 @@ async def export_pdf(
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
 
-    rows = await _query_vulns(db, severities, report_id, types, ip, qid)
+    rows = await _query_vulns(db, severities, report_id, types, ip, qid, os_classes)
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=15 * mm, rightMargin=15 * mm)

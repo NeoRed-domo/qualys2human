@@ -112,6 +112,44 @@ class Vulnerability(Base):
     )
 
 
+# Read-only mapping for the latest_vulns materialized view
+class LatestVuln(Base):
+    __tablename__ = "latest_vulns"
+    # Mirror Vulnerability columns — view has identical schema
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scan_report_id: Mapped[int] = mapped_column(Integer)
+    host_id: Mapped[int] = mapped_column(Integer, index=True)
+    qid: Mapped[int] = mapped_column(Integer, index=True)
+    title: Mapped[str] = mapped_column(Text)
+    vuln_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    severity: Mapped[int] = mapped_column(Integer, index=True)
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    protocol: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    fqdn: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ssl: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    first_detected: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_detected: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    times_detected: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    date_last_fixed: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cve_ids: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    vendor_reference: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bugtraq_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cvss_base: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cvss_temporal: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cvss3_base: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cvss3_temporal: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    threat: Mapped[str | None] = mapped_column(Text, nullable=True)
+    impact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    solution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    results: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pci_vuln: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ticket_state: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    tracking_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    layer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class ImportJob(Base):
     __tablename__ = "import_jobs"
 

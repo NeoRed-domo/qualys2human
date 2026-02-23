@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user
 from q2h.db.engine import get_db
-from q2h.db.models import Vulnerability, Host, ReportCoherenceCheck, VulnLayer
+from q2h.db.models import LatestVuln, Host, ReportCoherenceCheck, VulnLayer
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -56,31 +56,55 @@ class OverviewResponse(BaseModel):
     layer_distribution: list[LayerCount]
 
 
-def _apply_filters(stmt, severities, date_from, date_to, report_id, types, layers=None):
-    """Apply common filters to a Vulnerability query."""
+def _apply_filters(stmt, severities, date_from, date_to, report_id, types, layers=None, os_classes=None, host_joined=False):
+    """Apply common filters to a LatestVuln query."""
     if severities:
         sev_list = [int(s.strip()) for s in severities.split(",")]
-        stmt = stmt.where(Vulnerability.severity.in_(sev_list))
+        stmt = stmt.where(LatestVuln.severity.in_(sev_list))
     if date_from:
-        stmt = stmt.where(Vulnerability.first_detected >= date_from)
+        stmt = stmt.where(LatestVuln.first_detected >= date_from)
     if date_to:
-        stmt = stmt.where(Vulnerability.last_detected <= date_to)
+        stmt = stmt.where(LatestVuln.last_detected <= date_to)
     if report_id:
-        stmt = stmt.where(Vulnerability.scan_report_id == report_id)
+        stmt = stmt.where(LatestVuln.scan_report_id == report_id)
     if types:
         type_list = [t.strip() for t in types.split(",")]
-        stmt = stmt.where(Vulnerability.type.in_(type_list))
+        stmt = stmt.where(LatestVuln.type.in_(type_list))
     if layers:
         layer_list = [int(l.strip()) for l in layers.split(",")]
         # 0 = "Autre" (unclassified, layer_id IS NULL)
         if 0 in layer_list:
             real_ids = [lid for lid in layer_list if lid != 0]
             if real_ids:
-                stmt = stmt.where(or_(Vulnerability.layer_id.in_(real_ids), Vulnerability.layer_id.is_(None)))
+                stmt = stmt.where(or_(LatestVuln.layer_id.in_(real_ids), LatestVuln.layer_id.is_(None)))
             else:
-                stmt = stmt.where(Vulnerability.layer_id.is_(None))
+                stmt = stmt.where(LatestVuln.layer_id.is_(None))
         else:
-            stmt = stmt.where(Vulnerability.layer_id.in_(layer_list))
+            stmt = stmt.where(LatestVuln.layer_id.in_(layer_list))
+    if os_classes:
+        cls_list = [c.strip().lower() for c in os_classes.split(",")]
+        conditions = []
+        if "windows" in cls_list:
+            conditions.append(Host.os.ilike("%windows%"))
+        if "nix" in cls_list:
+            conditions.append(or_(
+                Host.os.ilike("%linux%"),
+                Host.os.ilike("%unix%"),
+                Host.os.ilike("%ubuntu%"),
+                Host.os.ilike("%debian%"),
+                Host.os.ilike("%centos%"),
+                Host.os.ilike("%red hat%"),
+                Host.os.ilike("%rhel%"),
+                Host.os.ilike("%suse%"),
+                Host.os.ilike("%fedora%"),
+                Host.os.ilike("%aix%"),
+                Host.os.ilike("%solaris%"),
+                Host.os.ilike("%freebsd%"),
+            ))
+        if conditions:
+            if not host_joined:
+                stmt = stmt.join(Host, LatestVuln.host_id == Host.id, isouter=False)
+            stmt = stmt.where(or_(*conditions))
     return stmt
 
 
@@ -94,29 +118,32 @@ async def dashboard_overview(
     report_id: Optional[int] = Query(None, description="Filter by scan report ID"),
     types: Optional[str] = Query(None, description="Comma-separated vuln types"),
     layers: Optional[str] = Query(None, description="Comma-separated layer IDs"),
+    os_classes: Optional[str] = Query(None, description="Comma-separated OS classes: windows,nix"),
 ):
+    fargs = (severities, date_from, date_to, report_id, types, layers, os_classes)
+
     # --- Total vulns ---
-    total_q = select(func.count(Vulnerability.id))
-    total_q = _apply_filters(total_q, severities, date_from, date_to, report_id, types, layers)
+    total_q = select(func.count(LatestVuln.id))
+    total_q = _apply_filters(total_q, *fargs)
     total_vulns = (await db.execute(total_q)).scalar() or 0
 
     # --- Distinct host count ---
-    host_q = select(func.count(func.distinct(Vulnerability.host_id)))
-    host_q = _apply_filters(host_q, severities, date_from, date_to, report_id, types, layers)
+    host_q = select(func.count(func.distinct(LatestVuln.host_id)))
+    host_q = _apply_filters(host_q, *fargs)
     host_count = (await db.execute(host_q)).scalar() or 0
 
     # --- Critical count (severity 4 + 5) ---
-    crit_q = select(func.count(Vulnerability.id)).where(Vulnerability.severity >= 4)
-    crit_q = _apply_filters(crit_q, severities, date_from, date_to, report_id, types, layers)
+    crit_q = select(func.count(LatestVuln.id)).where(LatestVuln.severity >= 4)
+    crit_q = _apply_filters(crit_q, *fargs)
     critical_count = (await db.execute(crit_q)).scalar() or 0
 
     # --- Severity distribution ---
     sev_q = (
-        select(Vulnerability.severity, func.count(Vulnerability.id).label("count"))
-        .group_by(Vulnerability.severity)
-        .order_by(Vulnerability.severity.desc())
+        select(LatestVuln.severity, func.count(LatestVuln.id).label("count"))
+        .group_by(LatestVuln.severity)
+        .order_by(LatestVuln.severity.desc())
     )
-    sev_q = _apply_filters(sev_q, severities, date_from, date_to, report_id, types, layers)
+    sev_q = _apply_filters(sev_q, *fargs)
     sev_rows = (await db.execute(sev_q)).all()
     severity_distribution = [
         SeverityCount(severity=row.severity, count=row.count) for row in sev_rows
@@ -125,16 +152,16 @@ async def dashboard_overview(
     # --- Top 10 vulns by frequency ---
     top_v_q = (
         select(
-            Vulnerability.qid,
-            Vulnerability.title,
-            Vulnerability.severity,
-            func.count(Vulnerability.id).label("count"),
+            LatestVuln.qid,
+            LatestVuln.title,
+            LatestVuln.severity,
+            func.count(LatestVuln.id).label("count"),
         )
-        .group_by(Vulnerability.qid, Vulnerability.title, Vulnerability.severity)
-        .order_by(func.count(Vulnerability.id).desc())
+        .group_by(LatestVuln.qid, LatestVuln.title, LatestVuln.severity)
+        .order_by(func.count(LatestVuln.id).desc())
         .limit(10)
     )
-    top_v_q = _apply_filters(top_v_q, severities, date_from, date_to, report_id, types, layers)
+    top_v_q = _apply_filters(top_v_q, *fargs)
     top_v_rows = (await db.execute(top_v_q)).all()
     top_vulns = [
         TopVuln(qid=r.qid, title=r.title, severity=r.severity, count=r.count)
@@ -147,14 +174,14 @@ async def dashboard_overview(
             Host.ip,
             Host.dns,
             Host.os,
-            func.count(Vulnerability.id).label("host_count"),
+            func.count(LatestVuln.id).label("host_count"),
         )
-        .join(Vulnerability, Vulnerability.host_id == Host.id)
+        .join(LatestVuln, LatestVuln.host_id == Host.id)
         .group_by(Host.id, Host.ip, Host.dns, Host.os)
-        .order_by(func.count(Vulnerability.id).desc())
+        .order_by(func.count(LatestVuln.id).desc())
         .limit(10)
     )
-    top_h_q = _apply_filters(top_h_q, severities, date_from, date_to, report_id, types, layers)
+    top_h_q = _apply_filters(top_h_q, *fargs, host_joined=True)
     top_h_rows = (await db.execute(top_h_q)).all()
     top_hosts = [
         TopHost(ip=r.ip, dns=r.dns, os=r.os, host_count=r.host_count)
@@ -182,13 +209,13 @@ async def dashboard_overview(
         select(
             VulnLayer.name,
             VulnLayer.color,
-            func.count(Vulnerability.id).label("count"),
+            func.count(LatestVuln.id).label("count"),
         )
-        .select_from(Vulnerability)
-        .outerjoin(VulnLayer, Vulnerability.layer_id == VulnLayer.id)
+        .select_from(LatestVuln)
+        .outerjoin(VulnLayer, LatestVuln.layer_id == VulnLayer.id)
         .group_by(VulnLayer.name, VulnLayer.color)
     )
-    layer_q = _apply_filters(layer_q, severities, date_from, date_to, report_id, types, layers)
+    layer_q = _apply_filters(layer_q, *fargs)
     layer_rows = (await db.execute(layer_q)).all()
     layer_distribution = [
         LayerCount(name=r.name, color=r.color, count=r.count)

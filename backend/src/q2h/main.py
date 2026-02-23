@@ -20,15 +20,51 @@ from q2h.api.branding import router as branding_router
 from q2h.api.monitoring import router as monitoring_router
 from q2h.api.preferences import router as preferences_router
 from q2h.api.layers import router as layers_router
+from q2h.api.settings import router as settings_router
+from q2h.api.watcher import router as watcher_router, set_watcher_service
 
 logger = logging.getLogger("q2h")
 
 
 async def _auto_import(filepath: Path):
-    """Callback used by the file watcher to import a CSV."""
+    """Callback used by the file watcher to import a CSV, with dedup."""
     import q2h.db.engine as db_engine
+    from q2h.ingestion.csv_parser import QualysCSVParser
     from q2h.ingestion.importer import QualysImporter
+    from q2h.db.models import ScanReport
+    from sqlalchemy import select, and_
 
+    # Dedup: parse header and check for matching report
+    try:
+        parser = QualysCSVParser(filepath)
+        meta = parser.parse_header()
+    except Exception:
+        logger.exception("Failed to parse header for dedup: %s", filepath.name)
+        meta = None
+
+    if meta and meta.report_date:
+        async with db_engine.SessionLocal() as session:
+            conditions = [ScanReport.report_date == meta.report_date]
+            if meta.asset_group:
+                conditions.append(ScanReport.asset_group == meta.asset_group)
+            if meta.total_vulns is not None:
+                conditions.append(ScanReport.total_vulns_declared == meta.total_vulns)
+
+            existing = (
+                await session.execute(select(ScanReport).where(and_(*conditions)))
+            ).scalar_one_or_none()
+
+            if existing:
+                logger.warning(
+                    "Skipping duplicate report: %s (matches report id=%d, date=%s, group=%s)",
+                    filepath.name,
+                    existing.id,
+                    meta.report_date,
+                    meta.asset_group,
+                )
+                return
+
+    # No duplicate found — proceed with import
     async with db_engine.SessionLocal() as session:
         importer = QualysImporter(session, filepath, source="auto")
         report = await importer.run()
@@ -46,8 +82,15 @@ async def lifespan(app: FastAPI):
     async with db_engine.SessionLocal() as session:
         await seed_defaults(session)
 
-    # Start file watcher if enabled
-    watcher = FileWatcherService(get_settings().watcher, _auto_import)
+    # Start file watcher (always — idles if no DB paths enabled)
+    settings = get_settings()
+    watcher = FileWatcherService(
+        db_session_factory=db_engine.SessionLocal,
+        import_callback=_auto_import,
+        poll_interval=settings.watcher.poll_interval,
+        stable_seconds=settings.watcher.stable_seconds,
+    )
+    set_watcher_service(watcher)
     watcher.start()
 
     yield
@@ -70,6 +113,8 @@ app.include_router(branding_router)
 app.include_router(monitoring_router)
 app.include_router(preferences_router)
 app.include_router(layers_router)
+app.include_router(watcher_router)
+app.include_router(settings_router)
 
 
 @app.get("/api/health")

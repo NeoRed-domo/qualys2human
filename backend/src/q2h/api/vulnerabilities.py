@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user
 from q2h.db.engine import get_db
-from q2h.db.models import Vulnerability, Host
+from q2h.db.models import LatestVuln, Host
 
 router = APIRouter(prefix="/api/vulnerabilities", tags=["vulnerabilities"])
 
@@ -55,19 +55,19 @@ async def vulnerability_detail(
 ):
     # Get one representative row for the QID info
     result = await db.execute(
-        select(Vulnerability).where(Vulnerability.qid == qid).limit(1)
+        select(LatestVuln).where(LatestVuln.qid == qid).limit(1)
     )
     vuln = result.scalar_one_or_none()
     if not vuln:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="QID not found")
 
     # Count affected hosts and total occurrences
-    host_count_q = select(func.count(func.distinct(Vulnerability.host_id))).where(
-        Vulnerability.qid == qid
+    host_count_q = select(func.count(func.distinct(LatestVuln.host_id))).where(
+        LatestVuln.qid == qid
     )
     affected_host_count = (await db.execute(host_count_q)).scalar() or 0
 
-    total_q = select(func.count(Vulnerability.id)).where(Vulnerability.qid == qid)
+    total_q = select(func.count(LatestVuln.id)).where(LatestVuln.qid == qid)
     total_occurrences = (await db.execute(total_q)).scalar() or 0
 
     return VulnDetailResponse(
@@ -97,7 +97,7 @@ async def vulnerability_hosts(
     page_size: int = Query(50, ge=1, le=500),
 ):
     # Total count
-    total_q = select(func.count(Vulnerability.id)).where(Vulnerability.qid == qid)
+    total_q = select(func.count(LatestVuln.id)).where(LatestVuln.qid == qid)
     total = (await db.execute(total_q)).scalar() or 0
 
     # Paginated host list
@@ -105,12 +105,12 @@ async def vulnerability_hosts(
     rows_q = (
         select(
             Host.ip, Host.dns, Host.os,
-            Vulnerability.port, Vulnerability.protocol,
-            Vulnerability.vuln_status,
-            Vulnerability.first_detected, Vulnerability.last_detected,
+            LatestVuln.port, LatestVuln.protocol,
+            LatestVuln.vuln_status,
+            LatestVuln.first_detected, LatestVuln.last_detected,
         )
-        .join(Vulnerability, Vulnerability.host_id == Host.id)
-        .where(Vulnerability.qid == qid)
+        .join(LatestVuln, LatestVuln.host_id == Host.id)
+        .where(LatestVuln.qid == qid)
         .order_by(Host.ip)
         .offset(offset)
         .limit(page_size)
