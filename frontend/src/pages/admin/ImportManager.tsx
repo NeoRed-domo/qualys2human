@@ -13,7 +13,12 @@ import {
   Modal,
   Input,
   notification,
+  Switch,
+  Form,
+  Badge,
+  DatePicker,
 } from 'antd';
+import dayjs from 'dayjs';
 import {
   UploadOutlined,
   ReloadOutlined,
@@ -23,6 +28,10 @@ import {
   ClockCircleOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
+  PlusOutlined,
+  EditOutlined,
+  EyeOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
@@ -30,11 +39,33 @@ import api from '../../api/client';
 
 const { Text } = Typography;
 
+// --- Watch path types ---
+
+interface WatchPath {
+  id: number;
+  path: string;
+  pattern: string;
+  recursive: boolean;
+  enabled: boolean;
+  ignore_before: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WatcherStatus {
+  running: boolean;
+  active_paths: number;
+  known_files: number;
+}
+
+// --- Import job types ---
+
 interface ImportJob {
   id: number;
   scan_report_id: number;
   filename: string;
   source: string;
+  report_date: string | null;
   status: string;
   progress: number;
   rows_processed: number;
@@ -52,6 +83,15 @@ const STATUS_TAG: Record<string, { color: string; icon: React.ReactNode }> = {
 };
 
 export default function ImportManager() {
+  // --- Watch paths state ---
+  const [watchPaths, setWatchPaths] = useState<WatchPath[]>([]);
+  const [watcherStatus, setWatcherStatus] = useState<WatcherStatus | null>(null);
+  const [wpLoading, setWpLoading] = useState(false);
+  const [wpModalOpen, setWpModalOpen] = useState(false);
+  const [editingWp, setEditingWp] = useState<WatchPath | null>(null);
+  const [wpForm] = Form.useForm();
+
+  // --- Import jobs state ---
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -59,6 +99,88 @@ export default function ImportManager() {
   const [uploading, setUploading] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+
+  // --- Watch paths API ---
+
+  const fetchWatchPaths = useCallback(async () => {
+    setWpLoading(true);
+    try {
+      const [pathsResp, statusResp] = await Promise.all([
+        api.get('/watcher/paths'),
+        api.get('/watcher/status'),
+      ]);
+      setWatchPaths(pathsResp.data);
+      setWatcherStatus(statusResp.data);
+    } catch {
+      // User may not be admin — silently ignore
+    } finally {
+      setWpLoading(false);
+    }
+  }, []);
+
+  const handleCreateOrUpdateWp = async () => {
+    try {
+      const values = await wpForm.validateFields();
+      const payload = {
+        ...values,
+        ignore_before: values.ignore_before ? values.ignore_before.toISOString() : null,
+      };
+      if (editingWp) {
+        await api.put(`/watcher/paths/${editingWp.id}`, payload);
+        message.success('Répertoire mis à jour');
+      } else {
+        await api.post('/watcher/paths', payload);
+        message.success('Répertoire ajouté');
+      }
+      setWpModalOpen(false);
+      setEditingWp(null);
+      wpForm.resetFields();
+      fetchWatchPaths();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message || 'Erreur';
+      message.error(detail);
+    }
+  };
+
+  const handleToggleWp = async (wp: WatchPath, enabled: boolean) => {
+    try {
+      await api.put(`/watcher/paths/${wp.id}`, { enabled });
+      fetchWatchPaths();
+    } catch {
+      message.error('Erreur lors de la mise à jour');
+    }
+  };
+
+  const handleDeleteWp = async (id: number) => {
+    try {
+      await api.delete(`/watcher/paths/${id}`);
+      message.success('Répertoire supprimé');
+      fetchWatchPaths();
+    } catch {
+      message.error('Erreur lors de la suppression');
+    }
+  };
+
+  const openEditWp = (wp: WatchPath) => {
+    setEditingWp(wp);
+    wpForm.setFieldsValue({
+      path: wp.path,
+      pattern: wp.pattern,
+      recursive: wp.recursive,
+      enabled: wp.enabled,
+      ignore_before: wp.ignore_before ? dayjs(wp.ignore_before) : null,
+    });
+    setWpModalOpen(true);
+  };
+
+  const openCreateWp = () => {
+    setEditingWp(null);
+    wpForm.resetFields();
+    wpForm.setFieldsValue({ pattern: '*.csv', recursive: false, enabled: true });
+    setWpModalOpen(true);
+  };
+
+  // --- Import jobs API ---
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -74,8 +196,9 @@ export default function ImportManager() {
   }, [page]);
 
   useEffect(() => {
+    fetchWatchPaths();
     fetchJobs();
-  }, [fetchJobs]);
+  }, [fetchWatchPaths, fetchJobs]);
 
   // Auto-refresh if any job is still processing
   useEffect(() => {
@@ -146,6 +269,87 @@ export default function ImportManager() {
     }
   };
 
+  // --- Watch paths columns ---
+
+  const wpColumns: ColumnsType<WatchPath> = [
+    {
+      title: 'Chemin',
+      dataIndex: 'path',
+      ellipsis: true,
+      render: (p: string) => (
+        <Space>
+          <FolderOpenOutlined />
+          <Text copyable style={{ fontFamily: 'monospace', fontSize: 12 }}>{p}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Pattern',
+      dataIndex: 'pattern',
+      width: 120,
+      render: (p: string) => <Text code>{p}</Text>,
+    },
+    {
+      title: 'Récursif',
+      dataIndex: 'recursive',
+      width: 90,
+      align: 'center',
+      render: (r: boolean) => (r ? <Tag color="blue">Oui</Tag> : <Tag>Non</Tag>),
+    },
+    {
+      title: 'Ignorer avant',
+      dataIndex: 'ignore_before',
+      width: 130,
+      render: (dt: string | null) => {
+        if (!dt) return '\u2014';
+        try {
+          return new Date(dt).toLocaleDateString('fr-FR');
+        } catch {
+          return dt;
+        }
+      },
+    },
+    {
+      title: 'Actif',
+      dataIndex: 'enabled',
+      width: 80,
+      align: 'center',
+      render: (enabled: boolean, record: WatchPath) => (
+        <Switch
+          checked={enabled}
+          size="small"
+          onChange={(checked) => handleToggleWp(record, checked)}
+        />
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 100,
+      render: (_: unknown, record: WatchPath) => (
+        <Space size="small">
+          <Button
+            type="text"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => openEditWp(record)}
+          />
+          <Popconfirm
+            title="Supprimer ce répertoire surveillé ?"
+            onConfirm={() => handleDeleteWp(record.id)}
+            okText="Supprimer"
+            okType="danger"
+            cancelText="Annuler"
+          >
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  // --- Import jobs columns ---
+
   const columns: ColumnsType<ImportJob> = [
     {
       title: 'ID',
@@ -166,6 +370,19 @@ export default function ImportManager() {
       ),
     },
     {
+      title: 'Date rapport',
+      dataIndex: 'report_date',
+      width: 130,
+      render: (dt: string | null) => {
+        if (!dt) return '—';
+        try {
+          return new Date(dt).toLocaleDateString('fr-FR');
+        } catch {
+          return dt;
+        }
+      },
+    },
+    {
       title: 'Statut',
       dataIndex: 'status',
       width: 120,
@@ -182,7 +399,7 @@ export default function ImportManager() {
       title: 'Progression',
       key: 'progress',
       width: 180,
-      render: (_: any, record: ImportJob) => {
+      render: (_: unknown, record: ImportJob) => {
         if (record.status === 'done') {
           return <Text type="success">{record.rows_processed} lignes</Text>;
         }
@@ -205,7 +422,7 @@ export default function ImportManager() {
       render: (id: number) => `#${id}`,
     },
     {
-      title: 'Date',
+      title: 'Date import',
       dataIndex: 'started_at',
       width: 170,
       render: (dt: string | null) => dt || '—',
@@ -214,7 +431,7 @@ export default function ImportManager() {
       title: 'Actions',
       key: 'actions',
       width: 80,
-      render: (_: any, record: ImportJob) => (
+      render: (_: unknown, record: ImportJob) => (
         <Popconfirm
           title="Supprimer ce rapport et toutes ses vulnérabilités associées ?"
           onConfirm={() => handleDeleteReport(record.scan_report_id)}
@@ -233,8 +450,53 @@ export default function ImportManager() {
     },
   ];
 
+  // --- Watcher status badge ---
+  const statusBadge = watcherStatus ? (
+    watcherStatus.active_paths > 0 ? (
+      <Badge status="success" text={`${watcherStatus.active_paths} répertoire(s) actif(s)`} />
+    ) : (
+      <Badge status="default" text="Aucun répertoire surveillé" />
+    )
+  ) : null;
+
   return (
     <div>
+      {/* Watch paths section */}
+      <Card
+        title={
+          <Space>
+            <EyeOutlined />
+            <span>Répertoires surveillés</span>
+          </Space>
+        }
+        extra={
+          <Space>
+            {statusBadge}
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              size="small"
+              onClick={openCreateWp}
+            >
+              Ajouter un répertoire
+            </Button>
+          </Space>
+        }
+        style={{ marginBottom: 16 }}
+        size="small"
+      >
+        <Table<WatchPath>
+          dataSource={watchPaths}
+          columns={wpColumns}
+          rowKey="id"
+          loading={wpLoading}
+          size="small"
+          pagination={false}
+          locale={{ emptyText: 'Aucun répertoire surveillé' }}
+        />
+      </Card>
+
+      {/* Import history section */}
       <Card
         title="Gestion des imports"
         extra={
@@ -244,7 +506,7 @@ export default function ImportManager() {
                 Importer un CSV
               </Button>
             </Upload>
-            <Button icon={<ReloadOutlined />} onClick={fetchJobs} loading={loading}>
+            <Button icon={<ReloadOutlined />} onClick={() => { fetchJobs(); fetchWatchPaths(); }} loading={loading}>
               Actualiser
             </Button>
             <Button
@@ -273,6 +535,7 @@ export default function ImportManager() {
         />
       </Card>
 
+      {/* Reset modal */}
       <Modal
         title="Réinitialiser toute la base"
         open={resetModalOpen}
@@ -299,6 +562,41 @@ export default function ImportManager() {
             placeholder="CONFIRMER"
           />
         </Space>
+      </Modal>
+
+      {/* Watch path create/edit modal */}
+      <Modal
+        title={editingWp ? 'Modifier le répertoire' : 'Ajouter un répertoire surveillé'}
+        open={wpModalOpen}
+        onCancel={() => {
+          setWpModalOpen(false);
+          setEditingWp(null);
+          wpForm.resetFields();
+        }}
+        onOk={handleCreateOrUpdateWp}
+        okText={editingWp ? 'Enregistrer' : 'Ajouter'}
+      >
+        <Form form={wpForm} layout="vertical">
+          <Form.Item
+            name="path"
+            label="Chemin du répertoire"
+            rules={[{ required: true, message: 'Chemin requis' }]}
+          >
+            <Input placeholder="C:\Qualys\Reports ou \\serveur\partage\qualys" />
+          </Form.Item>
+          <Form.Item name="pattern" label="Pattern de fichier">
+            <Input placeholder="*.csv" />
+          </Form.Item>
+          <Form.Item name="recursive" label="Scan récursif" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item name="ignore_before" label="Ignorer les fichiers avant">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="enabled" label="Actif" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

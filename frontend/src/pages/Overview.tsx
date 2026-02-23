@@ -23,6 +23,8 @@ interface OverviewData {
   top_hosts: { ip: string; dns: string | null; os: string | null; host_count: number }[];
   coherence_checks: { check_type: string; severity: string }[];
   layer_distribution: { name: string | null; color: string | null; count: number }[];
+  freshness_stale_days: number;
+  freshness_hide_days: number;
 }
 
 export default function Overview() {

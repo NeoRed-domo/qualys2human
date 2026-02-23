@@ -9,6 +9,7 @@ const ADMIN_TABS = [
   { key: '/admin/rules', label: 'Règles entreprise' },
   { key: '/admin/layers', label: 'Catégorisation' },
   { key: '/admin/branding', label: 'Branding' },
+  { key: '/admin/settings', label: 'Paramètres' },
 ];
 
 const TAB_HELP: Record<string, HelpTopic> = {
@@ -17,6 +18,7 @@ const TAB_HELP: Record<string, HelpTopic> = {
   '/admin/rules': 'admin-rules',
   '/admin/layers': 'admin-rules',
   '/admin/branding': 'admin-branding',
+  '/admin/settings': 'admin-rules',
 };
 
 export default function AdminLayout() {
