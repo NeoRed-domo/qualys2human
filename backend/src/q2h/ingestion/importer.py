@@ -2,7 +2,9 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.sql import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.db.models import ScanReport, Host, Vulnerability, ImportJob, ReportCoherenceCheck, VulnLayerRule
@@ -44,9 +46,10 @@ class QualysImporter:
         self.session.add(self.job)
         await self.session.flush()
 
-        # 4. Parse detail rows
+        # 4. Parse detail rows (filter out Qualys footer lines with IP lists)
         self.parser.find_detail_section_start()
         df = self.parser.parse_detail_rows()
+        df = df.filter(~pl.col("IP").str.contains(","))
         self.job.rows_total = len(df)
 
         # 4b. Load layer classification rules
@@ -59,7 +62,8 @@ class QualysImporter:
         ]
 
         # 5. Upsert hosts and insert vulnerabilities
-        host_cache: dict[str, Host] = {}
+        report_date = metadata.report_date or datetime.utcnow()
+        host_cache: dict[str, int] = {}  # ip -> host_id
         rows_processed = 0
 
         for row in df.iter_rows(named=True):
@@ -67,27 +71,33 @@ class QualysImporter:
             if not ip:
                 continue
 
-            # Upsert host
+            # Atomic upsert host with report_date for first_seen/last_seen
             if ip not in host_cache:
-                result = await self.session.execute(select(Host).where(Host.ip == ip))
-                host = result.scalar_one_or_none()
-                if host is None:
-                    host = Host(
-                        ip=ip,
-                        dns=row.get("DNS"),
-                        netbios=row.get("NetBIOS"),
-                        os=row.get("OS"),
-                        os_cpe=row.get("OS CPE"),
-                    )
-                    self.session.add(host)
-                    await self.session.flush()
-                else:
-                    host.last_seen = datetime.utcnow()
-                    host.dns = row.get("DNS") or host.dns
-                    host.os = row.get("OS") or host.os
-                host_cache[ip] = host
+                stmt = pg_insert(Host).values(
+                    ip=ip,
+                    dns=row.get("DNS"),
+                    netbios=row.get("NetBIOS"),
+                    os=row.get("OS"),
+                    os_cpe=row.get("OS CPE"),
+                    first_seen=report_date,
+                    last_seen=report_date,
+                )
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["ip"],
+                    set_={
+                        "dns": stmt.excluded.dns,
+                        "netbios": stmt.excluded.netbios,
+                        "os": stmt.excluded.os,
+                        "os_cpe": stmt.excluded.os_cpe,
+                        "first_seen": func.least(Host.first_seen, stmt.excluded.first_seen),
+                        "last_seen": func.greatest(Host.last_seen, stmt.excluded.last_seen),
+                    },
+                )
+                result = await self.session.execute(stmt.returning(Host.id))
+                host_id = result.scalar_one()
+                host_cache[ip] = host_id
 
-            host = host_cache[ip]
+            host_id = host_cache[ip]
 
             # Parse fields
             severity = int(row.get("Severity", "0") or "0")
@@ -124,7 +134,7 @@ class QualysImporter:
 
             vuln = Vulnerability(
                 scan_report_id=self.report.id,
-                host_id=host.id,
+                host_id=host_id,
                 qid=qid,
                 title=title_val,
                 vuln_status=row.get("Vuln Status"),
@@ -171,6 +181,12 @@ class QualysImporter:
         self.job.progress = 100
         self.job.status = "done"
         self.job.ended_at = datetime.utcnow()
+        await self.session.commit()
+
+        # 8. Refresh materialized view for dedup
+        await self.session.execute(
+            text("REFRESH MATERIALIZED VIEW CONCURRENTLY latest_vulns")
+        )
         await self.session.commit()
 
         return self.report

@@ -39,8 +39,8 @@ class Host(Base):
     netbios: Mapped[str | None] = mapped_column(String(255), nullable=True)
     os: Mapped[str | None] = mapped_column(String(500), nullable=True)
     os_cpe: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    first_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     vulnerabilities: Mapped[list["Vulnerability"]] = relationship(back_populates="host")
 
@@ -215,6 +215,29 @@ class TrendConfig(Base):
     max_window_days: Mapped[int] = mapped_column(Integer, default=365)
     query_timeout_seconds: Mapped[int] = mapped_column(Integer, default=30)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class WatchPath(Base):
+    __tablename__ = "watch_paths"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    path: Mapped[str] = mapped_column(Text, unique=True)
+    pattern: Mapped[str] = mapped_column(String(100), default="*.csv")
+    recursive: Mapped[bool] = mapped_column(Boolean, default=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    ignore_before: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AppSettings(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class TrendTemplate(Base):
