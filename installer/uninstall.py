@@ -55,6 +55,47 @@ def drop_database(install_dir: Path, logger) -> bool:
     return True
 
 
+def uninstall_postgresql(install_dir: Path, logger) -> bool:
+    """Stop and uninstall the portable PostgreSQL service and files."""
+    # Stop the PostgreSQL service
+    logger.info("Arret du service PostgreSQL (postgresql-q2h)...")
+    try:
+        subprocess.run(
+            ["sc", "stop", "postgresql-q2h"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except Exception:
+        pass
+
+    # Wait a moment for the service to stop
+    import time
+    time.sleep(3)
+
+    # Unregister the Windows service
+    logger.info("Suppression du service postgresql-q2h...")
+    try:
+        result = subprocess.run(
+            ["sc", "delete", "postgresql-q2h"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            logger.info("[OK] Service postgresql-q2h supprime")
+        else:
+            # Try via pg_ctl unregister
+            pg_ctl = install_dir / "pgsql" / "bin" / "pg_ctl.exe"
+            if pg_ctl.exists():
+                subprocess.run(
+                    [str(pg_ctl), "unregister", "-N", "postgresql-q2h"],
+                    capture_output=True, text=True, timeout=30,
+                )
+                logger.info("[OK] Service postgresql-q2h supprime via pg_ctl")
+    except Exception as e:
+        logger.warning("Suppression service PostgreSQL: %s", e)
+
+    logger.info("[OK] PostgreSQL desinstalle")
+    return True
+
+
 def main():
     banner("uninstall")
     print("  Mode: DESINSTALLATION\n")
@@ -83,6 +124,9 @@ def main():
     )
     if not keep_db:
         drop_database(install_dir, logger)
+        # Also uninstall PostgreSQL service — avoids needing the unknown
+        # superuser password on reinstall
+        uninstall_postgresql(install_dir, logger)
 
     # Delete files
     if prompt_confirm(f"Supprimer le repertoire {install_dir} ?", default=True):
