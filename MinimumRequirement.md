@@ -4,7 +4,7 @@
 
 | Composant | Minimum | Recommandé |
 |-----------|---------|------------|
-| **OS** | Windows Server 2019 | Windows Server 2022 |
+| **OS** | Windows Server 2016 | Windows Server 2022 |
 | **CPU** | 4 cores | 8 cores |
 | **RAM** | 8 Go | 16 Go |
 | **Disque** | 50 Go libres | 100 Go SSD |

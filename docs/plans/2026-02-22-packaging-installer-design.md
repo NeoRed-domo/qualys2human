@@ -8,7 +8,7 @@
 
 ## 1. Objectif
 
-Produire un livrable `.exe` auto-extractible unique (~400 Mo) permettant d'installer Qualys2Human from scratch sur un Windows Server 2019+ offline (air-gapped), sans aucun prérequis sur le serveur. L'application tourne en service Windows transparent (pas de fenêtre console).
+Produire un livrable `.exe` auto-extractible unique (~400 Mo) permettant d'installer Qualys2Human from scratch sur un Windows Server 2016+ offline (air-gapped), sans aucun prérequis sur le serveur. L'application tourne en service Windows transparent (pas de fenêtre console).
 
 Inclut également les scripts de mise à jour (upgrade) et de désinstallation (uninstall).
 
@@ -88,7 +88,7 @@ setup.py (orchestrateur)
   │  Prompts : dossier (C:\Q2H), port (8443), mdp admin
   │
   ├─► prereqs.py
-  │     • Vérifie Windows Server 2019+
+  │     • Vérifie Windows Server 2016+
   │     • Vérifie espace disque (>2 Go) et port disponible
   │     • Installe PostgreSQL en mode silencieux
   │     • Copie WinSW

@@ -7,5 +7,5 @@ database:
   port: 5432
   name: qualys2human
   user: q2h
-  password: changeme
+  password: CHANGE_ME
   encryption_key_file: ./keys/master.key

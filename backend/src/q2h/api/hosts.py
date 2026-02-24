@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user
 from q2h.db.engine import get_db
-from q2h.db.models import Vulnerability, Host
+from q2h.db.models import LatestVuln, Host
 
 router = APIRouter(prefix="/api/hosts", tags=["hosts"])
 
@@ -89,8 +89,8 @@ async def host_detail(
     if not host:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Host not found")
 
-    vuln_count_q = select(func.count(Vulnerability.id)).where(
-        Vulnerability.host_id == host.id
+    vuln_count_q = select(func.count(LatestVuln.id)).where(
+        LatestVuln.host_id == host.id
     )
     vuln_count = (await db.execute(vuln_count_q)).scalar() or 0
 
@@ -120,17 +120,17 @@ async def host_vulnerabilities(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Host not found")
 
     # Total count
-    total_q = select(func.count(Vulnerability.id)).where(
-        Vulnerability.host_id == host.id
+    total_q = select(func.count(LatestVuln.id)).where(
+        LatestVuln.host_id == host.id
     )
     total = (await db.execute(total_q)).scalar() or 0
 
     # Paginated vuln list
     offset = (page - 1) * page_size
     rows_q = (
-        select(Vulnerability)
-        .where(Vulnerability.host_id == host.id)
-        .order_by(Vulnerability.severity.desc(), Vulnerability.qid)
+        select(LatestVuln)
+        .where(LatestVuln.host_id == host.id)
+        .order_by(LatestVuln.severity.desc(), LatestVuln.qid)
         .offset(offset)
         .limit(page_size)
     )
@@ -168,9 +168,9 @@ async def full_detail(
     if not host:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Host not found")
 
-    vuln_q = select(Vulnerability).where(
-        Vulnerability.host_id == host.id,
-        Vulnerability.qid == qid,
+    vuln_q = select(LatestVuln).where(
+        LatestVuln.host_id == host.id,
+        LatestVuln.qid == qid,
     )
     vuln = (await db.execute(vuln_q)).scalar_one_or_none()
     if not vuln:

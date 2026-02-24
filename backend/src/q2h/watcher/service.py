@@ -35,6 +35,12 @@ class FileWatcherService:
         self._known_files: dict[str, float] = {}  # path -> last-seen mtime
         self._running = False
         self._task: asyncio.Task | None = None
+        # Activity tracking for UI feedback
+        self._scanning = False
+        self._importing: str | None = None
+        self._last_import: str | None = None
+        self._last_error: str | None = None
+        self._import_count: int = 0
 
     async def _load_paths_from_db(self) -> list[tuple[str, str, bool, datetime | None]]:
         """Query watch_paths WHERE enabled=True. Returns list of (path, pattern, recursive, ignore_before)."""
@@ -114,6 +120,14 @@ class FileWatcherService:
 
     async def _scan_directories(self):
         """Look for new or modified files in watched directories."""
+        self._scanning = True
+        try:
+            await self._do_scan()
+        finally:
+            self._scanning = False
+
+    async def _do_scan(self):
+        """Inner scan logic — separated so _scanning flag is always cleared."""
         watch_paths = await self._load_paths_from_db()
         for watch_path, pattern, recursive, ignore_before in watch_paths:
             p = Path(watch_path)
@@ -150,11 +164,18 @@ class FileWatcherService:
                 else:
                     logger.info("Modified file detected: %s", csv_file.name)
 
+                self._importing = csv_file.name
                 try:
                     await self.import_callback(csv_file)
                     logger.info("Import completed: %s", csv_file.name)
+                    self._last_import = csv_file.name
+                    self._last_error = None
+                    self._import_count += 1
                 except Exception:
                     logger.exception("Import failed: %s", csv_file.name)
+                    self._last_error = csv_file.name
+                finally:
+                    self._importing = None
 
     def _is_stable(self, filepath: Path) -> bool:
         """Check if the file has stopped growing (writer finished)."""

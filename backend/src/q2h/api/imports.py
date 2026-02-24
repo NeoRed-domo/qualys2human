@@ -30,6 +30,7 @@ class ImportJobResponse(BaseModel):
     scan_report_id: int
     filename: str
     source: str
+    report_date: str | None
     status: str
     progress: int
     rows_processed: int
@@ -65,7 +66,7 @@ async def list_imports(
     total = (await db.execute(count_q)).scalar()
 
     q = (
-        select(ImportJob, ScanReport.filename, ScanReport.source)
+        select(ImportJob, ScanReport.filename, ScanReport.source, ScanReport.report_date)
         .join(ScanReport, ImportJob.scan_report_id == ScanReport.id)
         .order_by(desc(ImportJob.id))
         .offset(offset)
@@ -74,12 +75,13 @@ async def list_imports(
     rows = (await db.execute(q)).all()
 
     items = []
-    for job, filename, source in rows:
+    for job, filename, source, report_date in rows:
         items.append(ImportJobResponse(
             id=job.id,
             scan_report_id=job.scan_report_id,
             filename=filename,
             source=source,
+            report_date=str(report_date) if report_date else None,
             status=job.status,
             progress=job.progress,
             rows_processed=job.rows_processed,
@@ -100,7 +102,7 @@ async def get_import(
 ):
     """Get status of a single import job."""
     q = (
-        select(ImportJob, ScanReport.filename, ScanReport.source)
+        select(ImportJob, ScanReport.filename, ScanReport.source, ScanReport.report_date)
         .join(ScanReport, ImportJob.scan_report_id == ScanReport.id)
         .where(ImportJob.id == job_id)
     )
@@ -108,12 +110,13 @@ async def get_import(
     if not row:
         raise HTTPException(404, "Import job not found")
 
-    job, filename, source = row
+    job, filename, source, report_date = row
     return ImportJobResponse(
         id=job.id,
         scan_report_id=job.scan_report_id,
         filename=filename,
         source=source,
+        report_date=str(report_date) if report_date else None,
         status=job.status,
         progress=job.progress,
         rows_processed=job.rows_processed,
@@ -157,6 +160,7 @@ async def upload_csv(
             rows_processed=importer.job.rows_processed,
         )
     except Exception as e:
+        await db.rollback()
         logger.exception("Import failed for %s", file.filename)
         raise HTTPException(500, f"Import failed: {str(e)}")
     finally:

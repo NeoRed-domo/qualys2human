@@ -1,5 +1,6 @@
 """Upgrade — backup current installation, replace files, run migrations, restart."""
 
+import os
 import shutil
 import ssl
 import subprocess
@@ -88,10 +89,29 @@ def run_migrations(install_dir: Path, logger) -> bool:
     """Run Alembic migrations after upgrade."""
     python_exe = install_dir / "python" / "python.exe"
     backend_dir = install_dir / "app" / "backend"
+
+    # Read DB credentials from config.yaml and pass via env var
+    # (same approach as database.py — bypasses the q2h config system)
+    import yaml
+    config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
+    db_conf = config.get("database", {})
+    db_url = (
+        f"postgresql+asyncpg://{db_conf.get('user', 'q2h')}:"
+        f"{db_conf.get('password', '')}@"
+        f"{db_conf.get('host', 'localhost')}:{db_conf.get('port', 5432)}/"
+        f"{db_conf.get('name', 'qualys2human')}"
+    )
+    env = {
+        **os.environ,
+        "Q2H_DATABASE_URL": db_url,
+        "Q2H_CONFIG": str(install_dir / "config.yaml"),
+    }
+
     try:
         result = subprocess.run(
             [str(python_exe), "-m", "alembic", "upgrade", "head"],
             cwd=backend_dir, capture_output=True, text=True, timeout=120,
+            env=env,
         )
         if result.returncode != 0:
             logger.error("Migrations echouees: %s", result.stderr[:500] if result.stderr else "")

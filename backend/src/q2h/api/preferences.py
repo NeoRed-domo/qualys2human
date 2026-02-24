@@ -15,11 +15,13 @@ router = APIRouter(prefix="/api/user/preferences", tags=["preferences"])
 class PreferencesResponse(BaseModel):
     layout: list | None = None
     settings: dict | None = None
+    last_seen_version: str | None = None
 
 
 class PreferencesUpdate(BaseModel):
     layout: list | None = None
     settings: dict | None = None
+    last_seen_version: str | None = None
 
 
 @router.get("", response_model=PreferencesResponse)
@@ -35,6 +37,7 @@ async def get_preferences(
     return PreferencesResponse(
         layout=prefs.get("layout"),
         settings=prefs.get("settings"),
+        last_seen_version=prefs.get("last_seen_version"),
     )
 
 
@@ -54,6 +57,8 @@ async def update_preferences(
         prefs["layout"] = body.layout
     if body.settings is not None:
         prefs["settings"] = body.settings
+    if body.last_seen_version is not None:
+        prefs["last_seen_version"] = body.last_seen_version
 
     u.preferences = prefs
     await db.commit()
@@ -61,6 +66,7 @@ async def update_preferences(
     return PreferencesResponse(
         layout=prefs.get("layout"),
         settings=prefs.get("settings"),
+        last_seen_version=prefs.get("last_seen_version"),
     )
 
 
@@ -81,4 +87,5 @@ async def reset_layout(
     return PreferencesResponse(
         layout=None,
         settings=prefs.get("settings"),
+        last_seen_version=prefs.get("last_seen_version"),
     )

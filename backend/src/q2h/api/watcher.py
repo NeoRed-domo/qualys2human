@@ -48,6 +48,11 @@ class WatcherStatusResponse(BaseModel):
     running: bool
     active_paths: int
     known_files: int
+    scanning: bool = False
+    importing: str | None = None
+    last_import: str | None = None
+    last_error: str | None = None
+    import_count: int = 0
 
 
 def _parse_ignore_before(value: str | None) -> datetime | None:
@@ -177,4 +182,18 @@ async def get_status(
     active = (await db.execute(count_q)).scalar() or 0
     known = len(_watcher_service._known_files) if _watcher_service else 0
     running = _watcher_service._running if _watcher_service else False
-    return WatcherStatusResponse(running=running, active_paths=active, known_files=known)
+    scanning = _watcher_service._scanning if _watcher_service else False
+    importing = _watcher_service._importing if _watcher_service else None
+    last_import = _watcher_service._last_import if _watcher_service else None
+    last_error = _watcher_service._last_error if _watcher_service else None
+    import_count = _watcher_service._import_count if _watcher_service else 0
+    return WatcherStatusResponse(
+        running=running,
+        active_paths=active,
+        known_files=known,
+        scanning=scanning,
+        importing=importing,
+        last_import=last_import,
+        last_error=last_error,
+        import_count=import_count,
+    )

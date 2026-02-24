@@ -46,9 +46,16 @@ def build_frontend(output: Path):
     src = FRONTEND_DIR / "dist"
     dst = output / "app" / "frontend"
     if dst.exists():
-        shutil.rmtree(dst)
+        shutil.rmtree(dst, onexc=_force_remove_readonly)
     shutil.copytree(src, dst)
     print(f"  Frontend build copied to {dst}")
+
+
+def _force_remove_readonly(func, path, exc_info):
+    """Handle Windows errors during rmtree (read-only files, locked __pycache__)."""
+    import stat
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 
 def prepare_python(output: Path):
@@ -56,7 +63,7 @@ def prepare_python(output: Path):
     print("\n=== Preparing embedded Python ===")
     dst = output / "python"
     if dst.exists():
-        shutil.rmtree(dst)
+        shutil.rmtree(dst, onexc=_force_remove_readonly)
 
     # Find the embedded Python — either a .zip or an already-extracted directory
     embed_dir = None
@@ -159,7 +166,7 @@ def collect_backend(output: Path):
     print("\n=== Collecting backend source ===")
     dst = output / "app" / "backend"
     if dst.exists():
-        shutil.rmtree(dst)
+        shutil.rmtree(dst, onexc=_force_remove_readonly)
 
     # Copy source
     src_dir = BACKEND_DIR / "src"
@@ -184,7 +191,7 @@ def collect_data(output: Path):
     print("\n=== Collecting data assets ===")
     dst = output / "data"
     if dst.exists():
-        shutil.rmtree(dst)
+        shutil.rmtree(dst, onexc=_force_remove_readonly)
     if DATA_DIR.exists():
         shutil.copytree(DATA_DIR, dst)
         print(f"  Data copied to {dst}")

@@ -99,7 +99,36 @@ async def lifespan(app: FastAPI):
     await db_engine.dispose_engine()
 
 
-app = FastAPI(title="Qualys2Human", version="1.0.0", lifespan=lifespan)
+APP_VERSION = "1.0.1.0"
+
+RELEASE_NOTES = {
+    "version": APP_VERSION,
+    "date": "2026-02-24",
+    "title": "Fraîcheur, déduplication et améliorations",
+    "features": [
+        "Filtre fraîcheur : vulnérabilités actives, obsolètes ou toutes",
+        "Page admin pour configurer les seuils de fraîcheur",
+        "Watcher : filtrage par date (ignore_before) et status enrichi",
+        "Popup Nouveautés après connexion sur nouvelle version",
+    ],
+    "fixes": [
+        "Correction du crash des migrations lors de l'upgrade",
+        "Catégorisation effective après reclassification",
+        "Déduplication correcte des vulnérabilités par serveur",
+        "Preset entreprise appliqué par défaut à la première connexion",
+        "Tooltip fonctionnel sur le graphique Top 10",
+        "Watcher : timezone et chemins UNC corrigés",
+    ],
+    "improvements": [
+        "Menu de navigation toujours visible (header sticky)",
+        "Nouvelles catégories : OS / Middleware-OS / Middleware-Application / Application",
+        "Version affichée dans le footer",
+        "Date du rapport visible dans l'historique des imports",
+    ],
+    "changelog_url": "https://github.com/NeoRed-domo/Qualys2Human/blob/master/CHANGELOG.md",
+}
+
+app = FastAPI(title="Qualys2Human", version=APP_VERSION, lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(vuln_router)
@@ -119,7 +148,12 @@ app.include_router(settings_router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": APP_VERSION}
+
+
+@app.get("/api/version")
+async def get_version():
+    return RELEASE_NOTES
 
 
 # --- Serve frontend static files (production) ---

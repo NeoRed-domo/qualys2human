@@ -5,6 +5,7 @@ const { Text } = Typography;
 
 export default function AppFooter() {
   const [footerText, setFooterText] = useState('');
+  const [version, setVersion] = useState('');
 
   useEffect(() => {
     fetch('/api/branding/settings')
@@ -14,6 +15,11 @@ export default function AppFooter() {
       })
       .then((data) => setFooterText(data.footer_text || ''))
       .catch(() => setFooterText(''));
+
+    fetch('/api/health')
+      .then((resp) => resp.json())
+      .then((data) => setVersion(data.version || ''))
+      .catch(() => {});
   }, []);
 
   const displayText = footerText || 'Qualys2Human';
@@ -22,7 +28,8 @@ export default function AppFooter() {
   return (
     <Layout.Footer style={{ textAlign: 'center', padding: '12px 24px', background: '#f0f2f5' }}>
       <Text type="secondary" style={{ fontSize: 13 }}>
-        {displayText} - NeoRed - 2026/{year}
+        {displayText} - NeoRed - Since 2026 - {year}
+        {version && <> - v{version}</>}
       </Text>
     </Layout.Footer>
   );

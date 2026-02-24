@@ -1674,7 +1674,7 @@ Endpoints:
 
 ## Phase 14: Packaging & Installer
 
-> **Outcome:** Single zip file that installs everything on a fresh Windows Server 2019+.
+> **Outcome:** Single zip file that installs everything on a fresh Windows Server 2016+.
 
 ### Task 14.1: Build Scripts
 

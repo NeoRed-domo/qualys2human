@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user, require_admin
@@ -161,6 +161,9 @@ async def delete_layer(
     )
     await db.delete(layer)
     await db.commit()
+    # Refresh materialized view so dashboard reflects nullified layer_ids
+    await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY latest_vulns"))
+    await db.commit()
     _reclassify.dirty = True
 
 
@@ -294,6 +297,11 @@ async def _run_reclassify():
                 state.progress = 5 + int(95 * (i + 1) / state.total_rules)
 
             await db.commit()
+
+            # Refresh materialized view so dashboard reflects new layer_ids
+            await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY latest_vulns"))
+            await db.commit()
+
             state.progress = 100
             state.dirty = False
     except Exception as e:

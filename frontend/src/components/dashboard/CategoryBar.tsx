@@ -30,9 +30,56 @@ const SEVERITY_COLORS: Record<number, string> = {
   1: '#52c41a',
 };
 
+interface ChartItem {
+  name: string;
+  fullTitle: string;
+  count: number;
+  qid: number;
+  severity: number;
+  fill: string;
+}
+
+function CustomTooltip({ active, payload }: any) {
+  if (!active || !payload?.[0]) return null;
+  const item: ChartItem = payload[0].payload;
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #d9d9d9',
+        borderRadius: 6,
+        padding: '8px 12px',
+        maxWidth: 360,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      }}
+    >
+      <div style={{ fontWeight: 600, fontSize: 12, color: '#1677ff' }}>
+        QID {item.qid}
+      </div>
+      <div
+        style={{
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          fontSize: 13,
+          marginBottom: 6,
+        }}
+      >
+        {item.fullTitle}
+      </div>
+      <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+        Occurrences : <strong style={{ color: item.fill }}>{item.count}</strong>
+      </div>
+      <div style={{ fontSize: 11, color: '#1677ff', marginTop: 4, fontStyle: 'italic' }}>
+        Cliquer sur la barre pour voir le detail
+      </div>
+    </div>
+  );
+}
+
 export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
-  const chartData = data.slice(0, 10).map((d) => ({
+  const chartData: ChartItem[] = data.slice(0, 10).map((d) => ({
     name: d.title.length > 30 ? d.title.slice(0, 27) + '...' : d.title,
+    fullTitle: d.title,
     count: d.count,
     qid: d.qid,
     severity: d.severity,
@@ -47,8 +94,8 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
           layout="vertical"
           margin={{ left: 20, right: 20, top: 5, bottom: 5 }}
           onClick={(state: any) => {
-            if (state?.activePayload?.[0]) {
-              onClickBar?.(state.activePayload[0].payload.qid);
+            if (state?.activePayload?.[0] && onClickBar) {
+              onClickBar(state.activePayload[0].payload.qid);
             }
           }}
           style={{ cursor: onClickBar ? 'pointer' : 'default' }}
@@ -57,11 +104,9 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
           <XAxis type="number" />
           <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 12 }} />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Occurrences']}
-            labelFormatter={(label) => {
-              const item = chartData.find((d) => d.name === label);
-              return item ? `QID ${item.qid} — ${label}` : label;
-            }}
+            content={<CustomTooltip />}
+            cursor={{ fill: 'rgba(0,0,0,0.06)' }}
+            wrapperStyle={{ zIndex: 1000 }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
             {chartData.map((entry, index) => (

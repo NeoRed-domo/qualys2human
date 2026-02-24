@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+venv/
 node_modules/
 dist/
 build/
@@ -8,9 +9,11 @@ build/
 .env
 keys/
 certs/
-data/branding/logo-custom.*
-data/branding/settings.json
+data/
 *.db
+
+# Backend config (contains passwords — use config.yaml.example as template)
+backend/config.yaml
 
 # Prerequisites (large binaries — download separately)
 prerequisites/*.exe
@@ -24,6 +27,7 @@ Qualys2Human-*.exe
 .pids/
 .claude/
 dev/
+memory/
 *.jpg
 exemple-qualys-raw.csv
 Description_projet.txt

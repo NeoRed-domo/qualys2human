@@ -165,13 +165,13 @@ PACKAGE_ROOT = SCRIPT_DIR.parent
 
 
 def check_os(logger) -> bool:
-    """Verify Windows Server 2019+ (build >= 17763)."""
+    """Verify Windows Server 2016+ (build >= 14393)."""
     if platform.system() != "Windows":
         logger.error("Ce programme est prevu pour Windows Server.")
         return False
     build = int(platform.version().split(".")[-1])
-    if build < 17763:
-        logger.error("Windows Server 2019 ou superieur requis (build actuel: %s)", build)
+    if build < 14393:
+        logger.error("Windows Server 2016 ou superieur requis (build actuel: %s)", build)
         return False
     logger.info("[OK] Windows %s (build %s)", platform.version(), build)
     return True

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Card,
   Table,
@@ -56,6 +56,11 @@ interface WatcherStatus {
   running: boolean;
   active_paths: number;
   known_files: number;
+  scanning: boolean;
+  importing: string | null;
+  last_import: string | null;
+  last_error: string | null;
+  import_count: number;
 }
 
 // --- Import job types ---
@@ -208,6 +213,24 @@ export default function ImportManager() {
     return () => clearInterval(interval);
   }, [jobs, fetchJobs]);
 
+  // Auto-refresh watcher status while scanning or importing (every 3s)
+  const watcherActiveRef = useRef(false);
+  watcherActiveRef.current = !!(watcherStatus?.scanning || watcherStatus?.importing);
+  useEffect(() => {
+    if (!watcherActiveRef.current) return;
+    const interval = setInterval(async () => {
+      try {
+        const resp = await api.get('/watcher/status');
+        setWatcherStatus(resp.data);
+        // If import just finished, also refresh jobs list
+        if (!resp.data.scanning && !resp.data.importing) {
+          fetchJobs();
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [watcherStatus?.scanning, watcherStatus?.importing, fetchJobs]);
+
   const uploadProps: UploadProps = {
     name: 'file',
     accept: '.csv',
@@ -275,6 +298,7 @@ export default function ImportManager() {
     {
       title: 'Chemin',
       dataIndex: 'path',
+      width: '40%',
       ellipsis: true,
       render: (p: string) => (
         <Space>
@@ -286,7 +310,7 @@ export default function ImportManager() {
     {
       title: 'Pattern',
       dataIndex: 'pattern',
-      width: 120,
+      width: 150,
       render: (p: string) => <Text code>{p}</Text>,
     },
     {
@@ -452,11 +476,46 @@ export default function ImportManager() {
 
   // --- Watcher status badge ---
   const statusBadge = watcherStatus ? (
-    watcherStatus.active_paths > 0 ? (
-      <Badge status="success" text={`${watcherStatus.active_paths} répertoire(s) actif(s)`} />
-    ) : (
-      <Badge status="default" text="Aucun répertoire surveillé" />
-    )
+    <Space direction="vertical" size={0} style={{ lineHeight: 1.4 }}>
+      {watcherStatus.importing ? (
+        <Badge
+          status="warning"
+          text={
+            <span>
+              <SyncOutlined spin style={{ color: '#fa8c16', marginRight: 4 }} />
+              Import en cours : <Text strong style={{ fontSize: 12 }}>{watcherStatus.importing}</Text>
+            </span>
+          }
+        />
+      ) : watcherStatus.scanning ? (
+        <Badge
+          status="processing"
+          text={
+            <span>
+              <SyncOutlined spin style={{ color: '#1890ff', marginRight: 4 }} />
+              Scan en cours...
+            </span>
+          }
+        />
+      ) : watcherStatus.active_paths > 0 ? (
+        <Badge
+          status="success"
+          text={
+            <span>
+              <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 4 }} />
+              {watcherStatus.active_paths} répertoire(s) actif(s) — {watcherStatus.import_count} import(s)
+            </span>
+          }
+        />
+      ) : (
+        <Badge status="default" text="Aucun répertoire surveillé" />
+      )}
+      {watcherStatus.last_error && (
+        <Text type="danger" style={{ fontSize: 11 }}>
+          Dernier échec : {watcherStatus.last_error}
+        </Text>
+      )}
+    </Space>
   ) : null;
 
   return (

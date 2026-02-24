@@ -11,7 +11,7 @@
 **Qualys2Human** is a web application that ingests Qualys vulnerability scanner CSV reports (from a few MB up to 1-2 GB) and produces actionable dashboards for security operations teams. It highlights top vulnerabilities, quick-wins, most vulnerable servers, and enables drill-down from overview to individual vulnerability details.
 
 ### Key Characteristics
-- **Offline deployment**: fully air-gapped Windows Server 2019+ environment
+- **Offline deployment**: fully air-gapped Windows Server 2016+ environment
 - **Volume**: 5,000 - 50,000 servers per report, hundreds of thousands of vulnerability rows
 - **Users**: 10-50 concurrent users
 - **Security-first**: encrypted database, AD authentication, audit logging
@@ -26,7 +26,7 @@ Single FastAPI backend process serving the React frontend as static files, plus 
 
 ```
 ┌─────────────────────────────────────────────────┐
-│              Windows Server 2019+                │
+│              Windows Server 2016+                │
 │                                                  │
 │  ┌──────────────────────────────────────────┐   │
 │  │        Qualys2Human Service (Windows)     │   │
@@ -324,7 +324,7 @@ Qualys2Human-v1.0.0-win64-offline.zip
 
 ### 10.2 Installation Process
 
-1. Check prerequisites (Windows 2019+, disk space, available ports)
+1. Check prerequisites (Windows 2016+, disk space, available ports)
 2. Interactive questions: install path, HTTP/HTTPS port, initial admin password
 3. Install PostgreSQL as Windows service (configurable port)
 4. Initialize DB + run Alembic migrations
@@ -384,6 +384,6 @@ trends:
 | Type | Content | Format |
 |------|---------|--------|
 | GitHub README.md | Project presentation, screenshots, quick start | Markdown |
-| MinimumRequirement.md | OS (Windows Server 2019+), CPU (4+ cores), RAM (8+ GB), Disk (50+ GB) | Markdown |
+| MinimumRequirement.md | OS (Windows Server 2016+), CPU (4+ cores), RAM (8+ GB), Disk (50+ GB) | Markdown |
 | In-app help | Tooltips on widgets, contextual `?` button per section, sliding help panel | React components |
 | PDF documentation | Admin guide + user guide | ReportLab-generated |

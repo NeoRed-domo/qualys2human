@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import api from '../api/client';
 
+const STORAGE_KEY = 'q2h_filters';
+
 interface FilterState {
   severities: number[];
   types: string[];
@@ -46,29 +48,65 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     layers: [],
   });
 
-  // Load enterprise rules as default filters on mount
+  // Load filters on mount: localStorage (returning user) or enterprise preset (new user)
   useEffect(() => {
-    api.get('/presets/enterprise')
-      .then((resp) => {
+    const load = async () => {
+      // Always fetch enterprise preset (needed for resetFilters)
+      try {
+        const resp = await api.get('/presets/enterprise');
         const { severities: sev, types: typ, layers: lay } = resp.data;
-        const defaults = {
+        enterpriseDefaults.current = {
           severities: Array.isArray(sev) ? sev : [],
           types: Array.isArray(typ) ? typ : [],
           layers: Array.isArray(lay) ? lay : [],
         };
-        enterpriseDefaults.current = defaults;
-        if (defaults.severities.length > 0) setSeverities(defaults.severities);
-        if (defaults.types.length > 0) setTypes(defaults.types);
-        if (defaults.layers.length > 0) setLayers(defaults.layers);
-      })
-      .catch(() => {
-        // If not authenticated or API error, continue with empty defaults
-      })
-      .finally(() => setReady(true));
+      } catch {
+        // keep empty defaults
+      }
+
+      // Check localStorage for user's saved filters
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const p = JSON.parse(saved);
+          if (Array.isArray(p.severities)) setSeverities(p.severities);
+          if (Array.isArray(p.types)) setTypes(p.types);
+          if (Array.isArray(p.layers)) setLayers(p.layers);
+          if (Array.isArray(p.osClasses)) setOsClasses(p.osClasses);
+          if (typeof p.freshness === 'string') setFreshness(p.freshness);
+        } catch {
+          // Corrupted — fall through to enterprise defaults
+          applyEnterprise();
+        }
+      } else {
+        // First visit — apply enterprise preset
+        applyEnterprise();
+      }
+
+      setReady(true);
+    };
+
+    const applyEnterprise = () => {
+      const d = enterpriseDefaults.current;
+      if (d.severities.length > 0) setSeverities(d.severities);
+      if (d.types.length > 0) setTypes(d.types);
+      if (d.layers.length > 0) setLayers(d.layers);
+    };
+
+    load();
   }, []);
 
+  // Persist filters to localStorage whenever they change
+  useEffect(() => {
+    if (!ready) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      severities, types, layers, osClasses, freshness,
+    }));
+  }, [severities, types, layers, osClasses, freshness, ready]);
+
   const resetFilters = useCallback(() => {
-    // Reset to enterprise defaults, not empty
+    // Reset to enterprise defaults and clear saved preferences
+    localStorage.removeItem(STORAGE_KEY);
     setSeverities(enterpriseDefaults.current.severities);
     setTypes(enterpriseDefaults.current.types);
     setLayers(enterpriseDefaults.current.layers);
