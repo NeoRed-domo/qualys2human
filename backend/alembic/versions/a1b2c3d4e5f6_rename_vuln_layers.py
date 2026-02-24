@@ -20,15 +20,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Rename layers:
-    #   1 OS            → OS               (unchanged)
-    #   2 Middleware     → Middleware - OS
-    #   3 Applicatif    → Middleware - Application
-    #   4 Réseau        → Application
     conn = op.get_bind()
-    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware - OS' WHERE id = 2"))
-    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware - Application' WHERE id = 3"))
-    conn.execute(text("UPDATE vuln_layers SET name = 'Application', color = '#1677ff' WHERE id = 4"))
+
+    # Rename layers using temporary names to avoid UNIQUE constraint violations.
+    # This makes the migration idempotent — safe to re-run after a partial failure.
+    conn.execute(text("UPDATE vuln_layers SET name = '__tmp_2' WHERE id = 2 AND name != 'Middleware - OS'"))
+    conn.execute(text("UPDATE vuln_layers SET name = '__tmp_3' WHERE id = 3 AND name != 'Middleware - Application'"))
+    conn.execute(text("UPDATE vuln_layers SET name = '__tmp_4' WHERE id = 4 AND name != 'Application'"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware - OS' WHERE id = 2 AND name = '__tmp_2'"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware - Application' WHERE id = 3 AND name = '__tmp_3'"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Application', color = '#1677ff' WHERE id = 4 AND name = '__tmp_4'"))
+    # Always ensure color is correct for id=4 (even if name was already set)
+    conn.execute(text("UPDATE vuln_layers SET color = '#1677ff' WHERE id = 4"))
 
     # Delete all old rules and re-seed with new layer assignments
     conn.execute(text("DELETE FROM vuln_layer_rules"))
@@ -89,11 +92,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Restore original layer names
     conn = op.get_bind()
-    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware' WHERE id = 2"))
-    conn.execute(text("UPDATE vuln_layers SET name = 'Applicatif' WHERE id = 3"))
-    conn.execute(text("UPDATE vuln_layers SET name = 'Réseau', color = '#52c41a' WHERE id = 4"))
+
+    # Restore original layer names (same temp-name strategy for idempotency)
+    conn.execute(text("UPDATE vuln_layers SET name = '__tmp_2' WHERE id = 2 AND name != 'Middleware'"))
+    conn.execute(text("UPDATE vuln_layers SET name = '__tmp_3' WHERE id = 3 AND name != 'Applicatif'"))
+    conn.execute(text("UPDATE vuln_layers SET name = '__tmp_4' WHERE id = 4 AND name != 'Réseau'"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware' WHERE id = 2 AND name = '__tmp_2'"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Applicatif' WHERE id = 3 AND name = '__tmp_3'"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Réseau', color = '#52c41a' WHERE id = 4 AND name = '__tmp_4'"))
+    conn.execute(text("UPDATE vuln_layers SET color = '#52c41a' WHERE id = 4"))
 
     # Delete new rules and re-seed original ones
     conn.execute(text("DELETE FROM vuln_layer_rules"))

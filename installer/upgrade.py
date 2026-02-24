@@ -130,8 +130,10 @@ def run_migrations(install_dir: Path, logger) -> bool:
 
 
 def rollback(install_dir: Path, backup_dir: Path, logger):
-    """Restore from backup on failure."""
+    """Restore from backup on failure — files AND database."""
     logger.warning("Rollback en cours depuis %s ...", backup_dir)
+
+    # Restore files
     for name in ["config.yaml", ".env"]:
         src = backup_dir / name
         if src.exists():
@@ -144,6 +146,44 @@ def rollback(install_dir: Path, backup_dir: Path, logger):
                 shutil.rmtree(dst)
             shutil.copytree(src, dst)
     logger.info("[OK] Fichiers restaures depuis le backup")
+
+    # Restore database from SQL dump
+    dump_file = backup_dir / "qualys2human.sql"
+    if dump_file.exists():
+        logger.info("Restauration de la base de donnees...")
+        import yaml
+        config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
+        db_conf = config.get("database", {})
+        db_name = db_conf.get("name", "qualys2human")
+        db_user = db_conf.get("user", "q2h")
+
+        psql_exe = install_dir / "pgsql" / "bin" / "psql.exe"
+        if not psql_exe.exists():
+            psql_exe = "psql"
+
+        env = {**os.environ, "PGPASSWORD": db_conf.get("password", "")}
+        try:
+            # Drop and recreate to ensure clean state
+            subprocess.run(
+                [str(psql_exe), "-U", db_user, "-h", "localhost", "-d", db_name,
+                 "-c", "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"],
+                env=env, capture_output=True, text=True, timeout=30,
+            )
+            # Restore from dump
+            result = subprocess.run(
+                [str(psql_exe), "-U", db_user, "-h", "localhost", "-d", db_name,
+                 "-f", str(dump_file)],
+                env=env, capture_output=True, text=True, timeout=300,
+            )
+            if result.returncode == 0:
+                logger.info("[OK] Base de donnees restauree depuis le backup")
+            else:
+                logger.warning("Restauration DB partielle: %s",
+                               result.stderr[:200] if result.stderr else "")
+        except Exception as e:
+            logger.warning("Restauration DB echouee: %s", e)
+    else:
+        logger.warning("Pas de dump SQL dans le backup — base non restauree")
 
 
 def health_check(port: int, logger, retries: int = 10, delay: float = 3.0) -> bool:
