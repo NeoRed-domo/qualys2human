@@ -114,7 +114,13 @@ def run_migrations(install_dir: Path, logger) -> bool:
             env=env,
         )
         if result.returncode != 0:
-            logger.error("Migrations echouees: %s", result.stderr[:500] if result.stderr else "")
+            logger.error("Migrations echouees:")
+            if result.stderr:
+                for line in result.stderr.strip().splitlines()[-30:]:
+                    logger.error("  %s", line)
+            if result.stdout:
+                for line in result.stdout.strip().splitlines()[-10:]:
+                    logger.error("  stdout: %s", line)
             return False
         logger.info("[OK] Migrations executees")
         return True

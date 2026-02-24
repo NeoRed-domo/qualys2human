@@ -40,6 +40,8 @@ Format de version : `MAJOR.EVOLUTION.MINOR.BUILD`
 - **Watcher : timezone ignore_before** — Suppression du timezone dans `ignore_before` pour eviter les comparaisons invalides.
 - **Watcher : chemins UNC** — Autorisation des chemins UNC (`\\server\share`) sans validation de chemin local.
 - **Installer : pipeline, login loop, branding paths, erreurs TS** — Corrections multiples du pipeline d'installation et du frontend.
+- **Migration rename layers crash asyncpg** — L'utilisation de `op.execute()` avec des strings bruts causait un crash asyncpg. Remplace par `conn.execute(text(...))` explicite. Protection `COALESCE` sur le `setval` pour eviter NULL. Corrige dans `backend/alembic/versions/a1b2c3d4e5f6`.
+- **upgrade.py : erreur migrations tronquee** — Le message d'erreur des migrations etait tronque a 500 caracteres, masquant l'erreur PostgreSQL reelle. Affiche desormais les 30 dernieres lignes de stderr. Corrige dans `installer/upgrade.py`.
 
 ---
 

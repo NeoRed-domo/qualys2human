@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 
 # revision identifiers, used by Alembic.
@@ -24,12 +25,13 @@ def upgrade() -> None:
     #   2 Middleware     → Middleware - OS
     #   3 Applicatif    → Middleware - Application
     #   4 Réseau        → Application
-    op.execute("UPDATE vuln_layers SET name = 'Middleware - OS'          WHERE id = 2")
-    op.execute("UPDATE vuln_layers SET name = 'Middleware - Application' WHERE id = 3")
-    op.execute("UPDATE vuln_layers SET name = 'Application',  color = '#1677ff' WHERE id = 4")
+    conn = op.get_bind()
+    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware - OS' WHERE id = 2"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware - Application' WHERE id = 3"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Application', color = '#1677ff' WHERE id = 4"))
 
     # Delete all old rules and re-seed with new layer assignments
-    op.execute("DELETE FROM vuln_layer_rules")
+    conn.execute(text("DELETE FROM vuln_layer_rules"))
 
     vuln_layer_rules = sa.table(
         'vuln_layer_rules',
@@ -80,18 +82,21 @@ def upgrade() -> None:
         {'layer_id': 4, 'match_field': 'title',    'pattern': 'exchange',            'priority': 41},
     ])
 
-    # Reset sequence
-    op.execute("SELECT setval('vuln_layer_rules_id_seq', (SELECT MAX(id) FROM vuln_layer_rules))")
+    # Reset sequence — protect against empty table (COALESCE)
+    conn.execute(text(
+        "SELECT setval('vuln_layer_rules_id_seq', COALESCE((SELECT MAX(id) FROM vuln_layer_rules), 1))"
+    ))
 
 
 def downgrade() -> None:
     # Restore original layer names
-    op.execute("UPDATE vuln_layers SET name = 'Middleware'  WHERE id = 2")
-    op.execute("UPDATE vuln_layers SET name = 'Applicatif'  WHERE id = 3")
-    op.execute("UPDATE vuln_layers SET name = 'Réseau', color = '#52c41a' WHERE id = 4")
+    conn = op.get_bind()
+    conn.execute(text("UPDATE vuln_layers SET name = 'Middleware' WHERE id = 2"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Applicatif' WHERE id = 3"))
+    conn.execute(text("UPDATE vuln_layers SET name = 'Réseau', color = '#52c41a' WHERE id = 4"))
 
     # Delete new rules and re-seed original ones
-    op.execute("DELETE FROM vuln_layer_rules")
+    conn.execute(text("DELETE FROM vuln_layer_rules"))
     vuln_layer_rules = sa.table(
         'vuln_layer_rules',
         sa.column('layer_id', sa.Integer),
@@ -133,4 +138,6 @@ def downgrade() -> None:
         {'layer_id': 4, 'match_field': 'category', 'pattern': 'snmp',                'priority': 38},
         {'layer_id': 4, 'match_field': 'category', 'pattern': 'dns and bind',        'priority': 37},
     ])
-    op.execute("SELECT setval('vuln_layer_rules_id_seq', (SELECT MAX(id) FROM vuln_layer_rules))")
+    conn.execute(text(
+        "SELECT setval('vuln_layer_rules_id_seq', COALESCE((SELECT MAX(id) FROM vuln_layer_rules), 1))"
+    ))
