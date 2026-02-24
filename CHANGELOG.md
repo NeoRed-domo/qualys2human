@@ -43,7 +43,7 @@ Format de version : `MAJOR.EVOLUTION.MINOR.BUILD`
 
 ---
 
-## [1.0.0.0] - 2026-02-23
+## [1.0.0.0] - 2026-02-22
 
 ### Version initiale (V1)
 
