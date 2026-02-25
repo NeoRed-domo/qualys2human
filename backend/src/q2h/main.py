@@ -99,25 +99,20 @@ async def lifespan(app: FastAPI):
     await db_engine.dispose_engine()
 
 
-APP_VERSION = "1.0.2.0"
+APP_VERSION = "1.0.3.0"
 
 RELEASE_NOTES = {
     "version": APP_VERSION,
     "date": "2026-02-25",
-    "title": "Drill-down graphiques, restrictions monitoring et catégorisation",
+    "title": "Filtres per-user et bouton Règles entreprise",
     "features": [
-        "Drill-down interactif sur tous les graphiques et camemberts",
-        "Colonne Catégorisation avec badge couleur sur tous les tableaux de vulnérabilités",
-        "Restriction profil monitoring : accès uniquement à la page Monitoring",
-        "Fraîcheur intégrée dans la page Règles entreprise",
+        "Filtres per-user : chaque utilisateur conserve ses propres filtres (localStorage isolé)",
+        "Bouton Règles entreprise : réapplique le preset admin à jour en un clic",
+        "Migration automatique de l'ancienne clé localStorage partagée vers la clé per-user",
     ],
-    "fixes": [
-        "Migration Alembic fiabilisée : driver psycopg2 synchrone + UPDATE atomique",
-        "Tooltip Top 10 : les clics passent désormais à travers vers les barres",
-    ],
+    "fixes": [],
     "improvements": [
-        "Logo réduit à 75% sur la page de connexion",
-        "Page Paramètres supprimée (fusionnée dans Règles entreprise)",
+        "Zone de boutons FilterBar fusionnée et extensible",
     ],
     "changelog_url": "https://github.com/NeoRed-domo/Qualys2Human/blob/master/CHANGELOG.md",
 }

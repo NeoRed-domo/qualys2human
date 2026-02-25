@@ -6,6 +6,20 @@ Format de version : `MAJOR.EVOLUTION.MINOR.BUILD`
 
 ---
 
+## [1.0.3.0] - 2026-02-25
+
+### Nouvelles fonctionnalites
+
+- **Filtres per-user** — Chaque utilisateur conserve ses propres filtres dans un localStorage isole (`q2h_filters_{username}`). Login user A / logout / login user B : chacun retrouve ses filtres.
+- **Bouton Regles entreprise** — Nouveau bouton (icone BankOutlined) dans la barre de filtres pour reappliquer le preset admin a jour en un clic. Re-fetch le preset depuis le backend pour avoir la derniere version.
+- **Migration automatique** — L'ancienne cle partagee `q2h_filters` est automatiquement migree vers la cle per-user au premier login.
+
+### Ameliorations
+
+- **Zone de boutons FilterBar** — Les 2 colonnes (reset + presets) fusionnees en une seule colonne avec `Space`. Ordre : Reset, Regles entreprise, PresetSelector.
+
+---
+
 ## [1.0.2.0] - 2026-02-25
 
 ### Nouvelles fonctionnalites

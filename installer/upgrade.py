@@ -233,6 +233,8 @@ def main():
     # Step 1: Stop service
     logger.info("Arret du service '%s'...", service_name)
     service_mod.stop_service(install_dir, service_name, logger)
+    logger.info("Attente de la liberation des fichiers...")
+    time.sleep(5)
 
     # Step 2: Backup
     print("\n--- Sauvegarde ---")

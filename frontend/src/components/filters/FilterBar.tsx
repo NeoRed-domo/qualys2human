@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Row, Col, Checkbox, Select, DatePicker, Button, Card } from 'antd';
-import { ClearOutlined } from '@ant-design/icons';
+import { Row, Col, Checkbox, Select, DatePicker, Button, Card, Space, Tooltip, message } from 'antd';
+import { ClearOutlined, BankOutlined } from '@ant-design/icons';
 import { useFilters } from '../../contexts/FilterContext';
 import PresetSelector from './PresetSelector';
 import api from '../../api/client';
@@ -37,7 +37,8 @@ interface FilterBarProps {
 export default function FilterBar({ extra }: FilterBarProps) {
   const {
     severities, types, layers, osClasses, freshness, dateFrom, dateTo,
-    setSeverities, setTypes, setLayers, setOsClasses, setFreshness, setDateFrom, setDateTo, resetFilters,
+    setSeverities, setTypes, setLayers, setOsClasses, setFreshness, setDateFrom, setDateTo,
+    resetFilters, applyEnterprisePreset,
   } = useFilters();
   const [layerOptions, setLayerOptions] = useState<LayerOption[]>([]);
 
@@ -48,6 +49,11 @@ export default function FilterBar({ extra }: FilterBarProps) {
       );
     }).catch(() => {});
   }, []);
+
+  const handleApplyEnterprise = async () => {
+    await applyEnterprisePreset();
+    message.success('Règles entreprise appliquées');
+  };
 
   return (
     <Card size="small" style={{ marginBottom: 16 }}>
@@ -132,14 +138,17 @@ export default function FilterBar({ extra }: FilterBarProps) {
           />
         </Col>
 
-        <Col xs={12} md={1}>
+        <Col xs={24} md={2}>
           <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>&nbsp;</div>
-          <Button icon={<ClearOutlined />} onClick={resetFilters} title="Réinitialiser" />
-        </Col>
-
-        <Col xs={12} md={1}>
-          <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 12 }}>&nbsp;</div>
-          <PresetSelector />
+          <Space size={4}>
+            <Tooltip title="Réinitialiser">
+              <Button icon={<ClearOutlined />} onClick={resetFilters} />
+            </Tooltip>
+            <Tooltip title="Appliquer les règles entreprise">
+              <Button icon={<BankOutlined />} onClick={handleApplyEnterprise} />
+            </Tooltip>
+            <PresetSelector />
+          </Space>
         </Col>
 
         {extra && (

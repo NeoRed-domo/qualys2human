@@ -1,7 +1,13 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import api from '../api/client';
+import { useAuth } from './AuthContext';
 
-const STORAGE_KEY = 'q2h_filters';
+const STORAGE_KEY_PREFIX = 'q2h_filters_';
+const LEGACY_STORAGE_KEY = 'q2h_filters';
+
+function getStorageKey(username: string): string {
+  return STORAGE_KEY_PREFIX + username;
+}
 
 interface FilterState {
   severities: number[];
@@ -24,6 +30,7 @@ interface FilterContextValue extends FilterState {
   setDateTo: (d: string | null) => void;
   setReportId: (id: number | null) => void;
   resetFilters: () => void;
+  applyEnterprisePreset: () => Promise<void>;
   toQueryString: () => string;
   ready: boolean;
 }
@@ -31,6 +38,7 @@ interface FilterContextValue extends FilterState {
 const FilterContext = createContext<FilterContextValue | undefined>(undefined);
 
 export function FilterProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [severities, setSeverities] = useState<number[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [layers, setLayers] = useState<number[]>([]);
@@ -41,6 +49,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [reportId, setReportId] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Track current username for use in callbacks
+  const usernameRef = useRef<string | null>(null);
+  usernameRef.current = user?.username ?? null;
+
   // Store enterprise defaults so resetFilters can restore them
   const enterpriseDefaults = useRef<{ severities: number[]; types: string[]; layers: number[] }>({
     severities: [],
@@ -48,8 +60,13 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     layers: [],
   });
 
-  // Load filters on mount: localStorage (returning user) or enterprise preset (new user)
+  // Load filters when user changes: localStorage (returning user) or enterprise preset (new user)
   useEffect(() => {
+    if (!user) {
+      setReady(false);
+      return;
+    }
+
     const load = async () => {
       // Always fetch enterprise preset (needed for resetFilters)
       try {
@@ -64,8 +81,17 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         // keep empty defaults
       }
 
+      const key = getStorageKey(user.username);
+
+      // Migration: if legacy key exists and no per-user key, migrate
+      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy && !localStorage.getItem(key)) {
+        localStorage.setItem(key, legacy);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
+
       // Check localStorage for user's saved filters
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(key);
       if (saved) {
         try {
           const p = JSON.parse(saved);
@@ -94,19 +120,20 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     };
 
     load();
-  }, []);
+  }, [user?.username]);
 
-  // Persist filters to localStorage whenever they change
+  // Persist filters to localStorage whenever they change (per-user)
   useEffect(() => {
-    if (!ready) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    if (!ready || !user) return;
+    localStorage.setItem(getStorageKey(user.username), JSON.stringify({
       severities, types, layers, osClasses, freshness,
     }));
-  }, [severities, types, layers, osClasses, freshness, ready]);
+  }, [severities, types, layers, osClasses, freshness, ready, user]);
 
   const resetFilters = useCallback(() => {
     // Reset to enterprise defaults and clear saved preferences
-    localStorage.removeItem(STORAGE_KEY);
+    const username = usernameRef.current;
+    if (username) localStorage.removeItem(getStorageKey(username));
     setSeverities(enterpriseDefaults.current.severities);
     setTypes(enterpriseDefaults.current.types);
     setLayers(enterpriseDefaults.current.layers);
@@ -115,6 +142,35 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDateFrom(null);
     setDateTo(null);
     setReportId(null);
+  }, []);
+
+  const applyEnterprisePreset = useCallback(async () => {
+    // Re-fetch enterprise preset to get latest version
+    try {
+      const resp = await api.get('/presets/enterprise');
+      const { severities: sev, types: typ, layers: lay } = resp.data;
+      enterpriseDefaults.current = {
+        severities: Array.isArray(sev) ? sev : [],
+        types: Array.isArray(typ) ? typ : [],
+        layers: Array.isArray(lay) ? lay : [],
+      };
+    } catch {
+      // Use cached defaults
+    }
+
+    const d = enterpriseDefaults.current;
+    setSeverities(d.severities);
+    setTypes(d.types);
+    setLayers(d.layers);
+    setOsClasses([]);
+    setFreshness('active');
+    setDateFrom(null);
+    setDateTo(null);
+    setReportId(null);
+
+    // Clear per-user storage (will be recreated by persist effect)
+    const username = usernameRef.current;
+    if (username) localStorage.removeItem(getStorageKey(username));
   }, []);
 
   const toQueryString = useCallback(() => {
@@ -135,7 +191,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       value={{
         severities, types, layers, osClasses, freshness, dateFrom, dateTo, reportId,
         setSeverities, setTypes, setLayers, setOsClasses, setFreshness, setDateFrom, setDateTo, setReportId,
-        resetFilters, toQueryString, ready,
+        resetFilters, applyEnterprisePreset, toQueryString, ready,
       }}
     >
       {children}

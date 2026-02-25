@@ -75,6 +75,25 @@ function CustomTooltip({ active, payload }: any) {
   );
 }
 
+/** Custom bar shape — native SVG rect with its own onClick.
+ *  Only the colored bar rectangle is clickable, not the full chart row. */
+function ClickableBar(props: any) {
+  const { fill, x, y, width, height, payload, onBarClick } = props;
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fill={fill}
+      rx={4}
+      ry={4}
+      style={{ cursor: onBarClick ? 'pointer' : 'default' }}
+      onClick={onBarClick ? () => onBarClick(payload.qid) : undefined}
+    />
+  );
+}
+
 export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
   const chartData: ChartItem[] = data.slice(0, 10).map((d) => ({
     name: d.title.length > 30 ? d.title.slice(0, 27) + '...' : d.title,
@@ -92,22 +111,16 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
           data={chartData}
           layout="vertical"
           margin={{ left: 20, right: 20, top: 5, bottom: 5 }}
-          onClick={(state: any) => {
-            if (state?.activePayload?.[0] && onClickBar) {
-              onClickBar(state.activePayload[0].payload.qid);
-            }
-          }}
-          style={{ cursor: onClickBar ? 'pointer' : 'default' }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis type="number" />
           <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 12 }} />
           <Tooltip
             content={<CustomTooltip />}
-            cursor={{ fill: 'rgba(0,0,0,0.06)' }}
-            wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+            cursor={false}
+            wrapperStyle={{ pointerEvents: 'none' }}
           />
-          <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+          <Bar dataKey="count" shape={(props: any) => <ClickableBar {...props} onBarClick={onClickBar} />}>
             {chartData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.fill} />
             ))}
