@@ -96,7 +96,7 @@ def run_migrations(install_dir: Path, logger) -> bool:
     config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
     db_conf = config.get("database", {})
     db_url = (
-        f"postgresql+asyncpg://{db_conf.get('user', 'q2h')}:"
+        f"postgresql+psycopg2://{db_conf.get('user', 'q2h')}:"
         f"{db_conf.get('password', '')}@"
         f"{db_conf.get('host', 'localhost')}:{db_conf.get('port', 5432)}/"
         f"{db_conf.get('name', 'qualys2human')}"

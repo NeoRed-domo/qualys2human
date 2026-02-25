@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func, case, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from q2h.auth.dependencies import get_current_user
+from q2h.auth.dependencies import get_current_user, require_data_access
 from q2h.db.engine import get_db
 from q2h.db.models import LatestVuln, Host, ReportCoherenceCheck, VulnLayer, AppSettings
 
@@ -24,17 +24,24 @@ async def _get_freshness_thresholds(db: AsyncSession) -> dict:
 
 
 def _apply_freshness(stmt, freshness_val: str, thresholds: dict):
-    """Apply freshness filter to a LatestVuln query."""
+    """Apply freshness filter to a LatestVuln query.
+
+    NULL last_detected is treated as active (not filtered out).
+    """
     if freshness_val == "all":
         return stmt
     if freshness_val == "stale":
         return stmt.where(
+            LatestVuln.last_detected.is_not(None),
             LatestVuln.last_detected < func.now() - text(f"interval '{thresholds['stale_days']} days'"),
             LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['hide_days']} days'"),
         )
-    # Default: active only
+    # Default: active only — include NULLs (unknown date = assume active)
     return stmt.where(
-        LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['stale_days']} days'")
+        or_(
+            LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['stale_days']} days'"),
+            LatestVuln.last_detected.is_(None),
+        )
     )
 
 
@@ -48,6 +55,8 @@ class TopVuln(BaseModel):
     title: str
     severity: int
     count: int
+    layer_name: Optional[str] = None
+    layer_color: Optional[str] = None
 
 
 class TopHost(BaseModel):
@@ -66,6 +75,7 @@ class CoherenceItem(BaseModel):
 
 
 class LayerCount(BaseModel):
+    id: Optional[int] = None
     name: Optional[str] = None
     color: Optional[str] = None
     count: int
@@ -139,7 +149,7 @@ def _apply_filters(stmt, severities, date_from, date_to, report_id, types, layer
 @router.get("/overview", response_model=OverviewResponse)
 async def dashboard_overview(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
     severities: Optional[str] = Query(None, description="Comma-separated severity levels"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
@@ -190,8 +200,11 @@ async def dashboard_overview(
             LatestVuln.title,
             LatestVuln.severity,
             func.count(LatestVuln.id).label("count"),
+            VulnLayer.name.label("layer_name"),
+            VulnLayer.color.label("layer_color"),
         )
-        .group_by(LatestVuln.qid, LatestVuln.title, LatestVuln.severity)
+        .outerjoin(VulnLayer, LatestVuln.layer_id == VulnLayer.id)
+        .group_by(LatestVuln.qid, LatestVuln.title, LatestVuln.severity, VulnLayer.name, VulnLayer.color)
         .order_by(func.count(LatestVuln.id).desc())
         .limit(10)
     )
@@ -199,7 +212,8 @@ async def dashboard_overview(
     top_v_q = _apply_freshness(top_v_q, freshness or "active", thresholds)
     top_v_rows = (await db.execute(top_v_q)).all()
     top_vulns = [
-        TopVuln(qid=r.qid, title=r.title, severity=r.severity, count=r.count)
+        TopVuln(qid=r.qid, title=r.title, severity=r.severity, count=r.count,
+                layer_name=r.layer_name, layer_color=r.layer_color)
         for r in top_v_rows
     ]
 
@@ -243,19 +257,20 @@ async def dashboard_overview(
     # --- Layer distribution ---
     layer_q = (
         select(
+            VulnLayer.id.label("layer_id"),
             VulnLayer.name,
             VulnLayer.color,
             func.count(LatestVuln.id).label("count"),
         )
         .select_from(LatestVuln)
         .outerjoin(VulnLayer, LatestVuln.layer_id == VulnLayer.id)
-        .group_by(VulnLayer.name, VulnLayer.color)
+        .group_by(VulnLayer.id, VulnLayer.name, VulnLayer.color)
     )
     layer_q = _apply_filters(layer_q, *fargs)
     layer_q = _apply_freshness(layer_q, freshness or "active", thresholds)
     layer_rows = (await db.execute(layer_q)).all()
     layer_distribution = [
-        LayerCount(name=r.name, color=r.color, count=r.count)
+        LayerCount(id=r.layer_id, name=r.name, color=r.color, count=r.count)
         for r in layer_rows
     ]
 

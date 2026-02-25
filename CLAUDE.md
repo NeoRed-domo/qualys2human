@@ -14,6 +14,7 @@
 - **Fichiers à mettre à jour** quand la version change :
   - `backend/src/q2h/main.py` → `APP_VERSION` + `RELEASE_NOTES`
   - `CHANGELOG.md` (racine)
+  - `scripts/package.py` → `VERSION` (nom du .zip et .exe doit refléter la version)
 
 ## Mises à jour obligatoires à chaque session
 À la **fin de chaque session** (ou avant un commit), mettre à jour **sans que l'utilisateur le demande** :
@@ -34,6 +35,16 @@
 - **DB** : PostgreSQL 18 (embedded/portable)
 - **Cible** : Windows Server 2016+, totalement offline/air-gapped
 - **API client** : `frontend/src/api/client.ts` (axios avec intercepteurs JWT)
+
+## Release & Packaging — TOUJOURS appliquer (sans demander)
+- Quand un build/package est fait, **toujours aligner** la version dans :
+  - `scripts/package.py` → `VERSION` (contrôle les noms `Qualys2Human-X.X.X.zip` et `.exe`)
+  - `backend/src/q2h/main.py` → `APP_VERSION`
+  - `CHANGELOG.md`
+- Après un push de release, **toujours fournir la commande `gh`** pour créer/uploader la release GitHub :
+  ```
+  gh release create vX.X.X.X "Qualys2Human-X.X.X.zip" "Qualys2Human-X.X.X.exe" --title "vX.X.X.X" --notes "..."
+  ```
 
 ## Conventions code
 - Backend : endpoints dans `backend/src/q2h/api/`, modèles dans `backend/src/q2h/db/models.py`

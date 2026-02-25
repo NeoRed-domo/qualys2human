@@ -5,9 +5,9 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from q2h.auth.dependencies import get_current_user
+from q2h.auth.dependencies import get_current_user, require_data_access
 from q2h.db.engine import get_db
-from q2h.db.models import LatestVuln, Host
+from q2h.db.models import LatestVuln, Host, VulnLayer
 
 router = APIRouter(prefix="/api/hosts", tags=["hosts"])
 
@@ -35,6 +35,8 @@ class HostVulnItem(BaseModel):
     first_detected: Optional[str] = None
     last_detected: Optional[str] = None
     tracking_method: Optional[str] = None
+    layer_name: Optional[str] = None
+    layer_color: Optional[str] = None
 
 
 class PaginatedVulns(BaseModel):
@@ -82,7 +84,7 @@ class FullDetailResponse(BaseModel):
 async def host_detail(
     ip: str,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
 ):
     result = await db.execute(select(Host).where(Host.ip == ip))
     host = result.scalar_one_or_none()
@@ -110,7 +112,7 @@ async def host_detail(
 async def host_vulnerabilities(
     ip: str,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
 ):
@@ -125,16 +127,17 @@ async def host_vulnerabilities(
     )
     total = (await db.execute(total_q)).scalar() or 0
 
-    # Paginated vuln list
+    # Paginated vuln list with layer info
     offset = (page - 1) * page_size
     rows_q = (
-        select(LatestVuln)
+        select(LatestVuln, VulnLayer.name.label("layer_name"), VulnLayer.color.label("layer_color"))
+        .outerjoin(VulnLayer, LatestVuln.layer_id == VulnLayer.id)
         .where(LatestVuln.host_id == host.id)
         .order_by(LatestVuln.severity.desc(), LatestVuln.qid)
         .offset(offset)
         .limit(page_size)
     )
-    rows = (await db.execute(rows_q)).scalars().all()
+    rows = (await db.execute(rows_q)).all()
 
     items = [
         HostVulnItem(
@@ -149,8 +152,10 @@ async def host_vulnerabilities(
             first_detected=v.first_detected.isoformat() if v.first_detected else None,
             last_detected=v.last_detected.isoformat() if v.last_detected else None,
             tracking_method=v.tracking_method,
+            layer_name=layer_name,
+            layer_color=layer_color,
         )
-        for v in rows
+        for v, layer_name, layer_color in rows
     ]
 
     return PaginatedVulns(items=items, total=total, page=page, page_size=page_size)
@@ -161,7 +166,7 @@ async def full_detail(
     ip: str,
     qid: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
 ):
     result = await db.execute(select(Host).where(Host.ip == ip))
     host = result.scalar_one_or_none()

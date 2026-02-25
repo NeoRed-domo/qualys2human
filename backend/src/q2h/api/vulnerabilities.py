@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from q2h.auth.dependencies import get_current_user
+from q2h.auth.dependencies import get_current_user, require_data_access
 from q2h.db.engine import get_db
 from q2h.db.models import LatestVuln, Host
 
@@ -51,7 +51,7 @@ class PaginatedHosts(BaseModel):
 async def vulnerability_detail(
     qid: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
 ):
     # Get one representative row for the QID info
     result = await db.execute(
@@ -92,7 +92,7 @@ async def vulnerability_detail(
 async def vulnerability_hosts(
     qid: int,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
 ):

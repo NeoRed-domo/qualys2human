@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Checkbox, Button, message, Spin, Typography, Divider } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
+import { Card, Checkbox, Button, message, Spin, Typography, Divider, InputNumber, Tooltip } from 'antd';
+import { SaveOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import api from '../../api/client';
 
 const { Text } = Typography;
@@ -29,20 +29,25 @@ export default function EnterpriseRules() {
   const [types, setTypes] = useState<string[]>([]);
   const [layers, setLayers] = useState<number[]>([]);
   const [layerOptions, setLayerOptions] = useState<LayerOption[]>([]);
+  const [staleDays, setStaleDays] = useState<number>(7);
+  const [hideDays, setHideDays] = useState<number>(30);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [presetResp, layersResp] = await Promise.all([
+        const [presetResp, layersResp, freshnessResp] = await Promise.all([
           api.get('/presets/enterprise'),
           api.get('/layers'),
+          api.get('/settings/freshness'),
         ]);
         setSeverities(presetResp.data.severities);
         setTypes(presetResp.data.types);
         setLayers(presetResp.data.layers || []);
         setLayerOptions(layersResp.data);
+        setStaleDays(freshnessResp.data.stale_days ?? 7);
+        setHideDays(freshnessResp.data.hide_days ?? 30);
       } catch {
         message.error('Erreur lors du chargement');
       } finally {
@@ -55,7 +60,10 @@ export default function EnterpriseRules() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/presets/enterprise', { severities, types, layers });
+      await Promise.all([
+        api.put('/presets/enterprise', { severities, types, layers }),
+        api.put('/settings/freshness', { stale_days: staleDays, hide_days: hideDays }),
+      ]);
       message.success('Règles enregistrées');
     } catch (err: any) {
       message.error(err.response?.data?.detail || 'Erreur');
@@ -110,6 +118,40 @@ export default function EnterpriseRules() {
             <Text type="secondary">Aucun filtre de catégorisation — toutes les catégorisations sont affichées.</Text>
           </div>
         )}
+
+        <Divider titlePlacement="left">Seuils de fraîcheur</Divider>
+        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ marginBottom: 4 }}>
+              <Text>Seuil « peut-être obsolète » (jours)</Text>{' '}
+              <Tooltip title="Les vulnérabilités non vues depuis ce nombre de jours seront marquées comme potentiellement obsolètes.">
+                <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+              </Tooltip>
+            </div>
+            <InputNumber
+              min={1}
+              max={365}
+              value={staleDays}
+              onChange={(v) => setStaleDays(v ?? 7)}
+              style={{ width: 120 }}
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 4 }}>
+              <Text>Seuil « masquée » (jours)</Text>{' '}
+              <Tooltip title="Les vulnérabilités non vues depuis ce nombre de jours seront masquées par défaut.">
+                <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+              </Tooltip>
+            </div>
+            <InputNumber
+              min={1}
+              max={3650}
+              value={hideDays}
+              onChange={(v) => setHideDays(v ?? 30)}
+              style={{ width: 120 }}
+            />
+          </div>
+        </div>
       </Card>
     </div>
   );

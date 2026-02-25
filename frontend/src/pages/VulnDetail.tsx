@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Descriptions, Tag, Row, Col, Spin, Alert, Button, Typography } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef } from 'ag-grid-community';
@@ -55,6 +55,7 @@ export default function VulnDetail() {
   const [hosts, setHosts] = useState<HostRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (!qid) return;
@@ -95,6 +96,11 @@ export default function VulnDetail() {
   });
   const trackingData = Object.entries(trackingMap).map(([name, value]) => ({ name, value }));
 
+  // Filter hosts by selected pie slice
+  const filteredHosts = statusFilter
+    ? hosts.filter((h) => (h.vuln_status || 'Inconnu') === statusFilter)
+    : hosts;
+
   const hostCols: ColDef<HostRow>[] = [
     { field: 'ip', headerName: 'IP', width: 140 },
     { field: 'dns', headerName: 'DNS', flex: 1, minWidth: 180 },
@@ -104,6 +110,14 @@ export default function VulnDetail() {
     { field: 'vuln_status', headerName: 'Statut', width: 120 },
     { field: 'last_detected', headerName: 'Dernière détection', width: 160 },
   ];
+
+  const tableTitle = statusFilter
+    ? (
+      <span>
+        Serveurs affectés — filtre : <Tag color="blue" closable onClose={() => setStatusFilter(null)}>{statusFilter}</Tag>
+      </span>
+    )
+    : 'Serveurs affectés';
 
   return (
     <div>
@@ -171,10 +185,10 @@ export default function VulnDetail() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={16}>
-          <Card title="Serveurs affectés" size="small">
+          <Card title={tableTitle} size="small">
             <div style={{ height: 360 }}>
               <AgGridReact<HostRow>
-                rowData={hosts}
+                rowData={filteredHosts}
                 columnDefs={hostCols}
                 domLayout="normal"
                 rowHeight={36}
@@ -200,6 +214,10 @@ export default function VulnDetail() {
                     dataKey="value"
                     nameKey="name"
                     label
+                    onClick={(entry) => {
+                      setStatusFilter((prev) => prev === entry.name ? null : entry.name);
+                    }}
+                    style={{ cursor: 'pointer' }}
                   >
                     {trackingData.map((_, i) => (
                       <Cell key={i} fill={TRACKING_COLORS[i % TRACKING_COLORS.length]} />
@@ -209,6 +227,13 @@ export default function VulnDetail() {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+              {statusFilter && (
+                <div style={{ textAlign: 'center', marginTop: 4 }}>
+                  <Button size="small" icon={<CloseCircleOutlined />} onClick={() => setStatusFilter(null)}>
+                    Réinitialiser
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
         </Col>

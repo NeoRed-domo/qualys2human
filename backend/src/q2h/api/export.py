@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from q2h.auth.dependencies import get_current_user
+from q2h.auth.dependencies import get_current_user, require_data_access
 from q2h.db.engine import get_db
 from q2h.db.models import LatestVuln, Host, ScanReport
 
@@ -93,7 +93,7 @@ CSV_COLUMNS = [
 @router.get("/csv")
 async def export_csv(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
     view: str = Query("overview"),
     severities: Optional[str] = Query(None),
     report_id: Optional[int] = Query(None),
@@ -131,7 +131,7 @@ async def export_csv(
 @router.get("/pdf")
 async def export_pdf(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
     view: str = Query("overview"),
     severities: Optional[str] = Query(None),
     report_id: Optional[int] = Query(None),

@@ -26,3 +26,13 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
             status_code=status.HTTP_403_FORBIDDEN, detail="Admin required"
         )
     return user
+
+
+async def require_data_access(user: dict = Depends(get_current_user)) -> dict:
+    """Block monitoring-only profiles from accessing vulnerability data."""
+    if user.get("profile") == "monitoring":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Monitoring profile cannot access vulnerability data",
+        )
+    return user

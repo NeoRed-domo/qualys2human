@@ -19,17 +19,17 @@ interface OverviewData {
   host_count: number;
   critical_count: number;
   severity_distribution: { severity: number; count: number }[];
-  top_vulns: { qid: number; title: string; severity: number; count: number }[];
+  top_vulns: { qid: number; title: string; severity: number; count: number; layer_name: string | null; layer_color: string | null }[];
   top_hosts: { ip: string; dns: string | null; os: string | null; host_count: number }[];
   coherence_checks: { check_type: string; severity: string }[];
-  layer_distribution: { name: string | null; color: string | null; count: number }[];
+  layer_distribution: { id: number | null; name: string | null; color: string | null; count: number }[];
   freshness_stale_days: number;
   freshness_hide_days: number;
 }
 
 export default function Overview() {
   const navigate = useNavigate();
-  const { toQueryString, severities, types, layers, osClasses, freshness, dateFrom, dateTo, reportId, ready } = useFilters();
+  const { toQueryString, severities, setSeverities, types, layers, setLayers, osClasses, freshness, dateFrom, dateTo, reportId, ready } = useFilters();
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +78,37 @@ export default function Overview() {
         {
           key: 'severity',
           label: 'Répartition par sévérité',
-          content: <SeverityDonut data={data.severity_distribution} />,
+          content: (
+            <SeverityDonut
+              data={data.severity_distribution}
+              onClickSeverity={(sev) => {
+                // Toggle: if already filtered to this severity only, reset to all
+                if (severities.length === 1 && severities[0] === sev) {
+                  setSeverities([1, 2, 3, 4, 5]);
+                } else {
+                  setSeverities([sev]);
+                }
+              }}
+            />
+          ),
         },
         {
           key: 'layer',
           label: 'Répartition par catégorisation',
-          content: <LayerDonut data={data.layer_distribution} />,
+          content: (
+            <LayerDonut
+              data={data.layer_distribution}
+              onClickLayer={(layerId) => {
+                // 0 = "Autre" (unclassified). Toggle: click same = reset
+                const filterId = layerId ?? 0;
+                if (layers.length === 1 && layers[0] === filterId) {
+                  setLayers([]);
+                } else {
+                  setLayers([filterId]);
+                }
+              }}
+            />
+          ),
         },
         {
           key: 'category',

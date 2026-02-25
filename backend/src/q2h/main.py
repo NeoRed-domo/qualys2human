@@ -99,31 +99,25 @@ async def lifespan(app: FastAPI):
     await db_engine.dispose_engine()
 
 
-APP_VERSION = "1.0.1.0"
+APP_VERSION = "1.0.2.0"
 
 RELEASE_NOTES = {
     "version": APP_VERSION,
-    "date": "2026-02-24",
-    "title": "Fraîcheur, déduplication et améliorations",
+    "date": "2026-02-25",
+    "title": "Drill-down graphiques, restrictions monitoring et catégorisation",
     "features": [
-        "Filtre fraîcheur : vulnérabilités actives, obsolètes ou toutes",
-        "Page admin pour configurer les seuils de fraîcheur",
-        "Watcher : filtrage par date (ignore_before) et status enrichi",
-        "Popup Nouveautés après connexion sur nouvelle version",
+        "Drill-down interactif sur tous les graphiques et camemberts",
+        "Colonne Catégorisation avec badge couleur sur tous les tableaux de vulnérabilités",
+        "Restriction profil monitoring : accès uniquement à la page Monitoring",
+        "Fraîcheur intégrée dans la page Règles entreprise",
     ],
     "fixes": [
-        "Correction du crash des migrations lors de l'upgrade",
-        "Catégorisation effective après reclassification",
-        "Déduplication correcte des vulnérabilités par serveur",
-        "Preset entreprise appliqué par défaut à la première connexion",
-        "Tooltip fonctionnel sur le graphique Top 10",
-        "Watcher : timezone et chemins UNC corrigés",
+        "Migration Alembic fiabilisée : driver psycopg2 synchrone + UPDATE atomique",
+        "Tooltip Top 10 : les clics passent désormais à travers vers les barres",
     ],
     "improvements": [
-        "Menu de navigation toujours visible (header sticky)",
-        "Nouvelles catégories : OS / Middleware-OS / Middleware-Application / Application",
-        "Version affichée dans le footer",
-        "Date du rapport visible dans l'historique des imports",
+        "Logo réduit à 75% sur la page de connexion",
+        "Page Paramètres supprimée (fusionnée dans Règles entreprise)",
     ],
     "changelog_url": "https://github.com/NeoRed-domo/Qualys2Human/blob/master/CHANGELOG.md",
 }

@@ -14,12 +14,17 @@ import UserManagement from './pages/admin/UserManagement';
 import EnterpriseRules from './pages/admin/EnterpriseRules';
 import Branding from './pages/admin/Branding';
 import LayerRules from './pages/admin/LayerRules';
-import Settings from './pages/admin/Settings';
 import Monitoring from './pages/Monitoring';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function MonitoringGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.profile === 'monitoring') return <Navigate to="/monitoring" replace />;
+  return <>{children}</>;
 }
 
 function Placeholder({ title }: { title: string }) {
@@ -44,22 +49,21 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         >
-          <Route index element={<Overview />} />
-          <Route path="trends" element={<Placeholder title="Tendances" />} />
-          <Route path="admin" element={<AdminLayout />}>
+          <Route index element={<MonitoringGuard><Overview /></MonitoringGuard>} />
+          <Route path="trends" element={<MonitoringGuard><Placeholder title="Tendances" /></MonitoringGuard>} />
+          <Route path="admin" element={<MonitoringGuard><AdminLayout /></MonitoringGuard>}>
             <Route index element={<Navigate to="/admin/imports" replace />} />
             <Route path="imports" element={<ImportManager />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="rules" element={<EnterpriseRules />} />
             <Route path="branding" element={<Branding />} />
             <Route path="layers" element={<LayerRules />} />
-            <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="monitoring" element={<Monitoring />} />
-          <Route path="profile" element={<Placeholder title="Mon Profil" />} />
-          <Route path="vulnerabilities/:qid" element={<VulnDetail />} />
-          <Route path="hosts/:ip" element={<HostDetail />} />
-          <Route path="hosts/:ip/vulnerabilities/:qid" element={<FullDetail />} />
+          <Route path="profile" element={<MonitoringGuard><Placeholder title="Mon Profil" /></MonitoringGuard>} />
+          <Route path="vulnerabilities/:qid" element={<MonitoringGuard><VulnDetail /></MonitoringGuard>} />
+          <Route path="hosts/:ip" element={<MonitoringGuard><HostDetail /></MonitoringGuard>} />
+          <Route path="hosts/:ip/vulnerabilities/:qid" element={<MonitoringGuard><FullDetail /></MonitoringGuard>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

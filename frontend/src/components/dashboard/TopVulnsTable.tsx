@@ -10,6 +10,8 @@ interface TopVuln {
   title: string;
   severity: number;
   count: number;
+  layer_name: string | null;
+  layer_color: string | null;
 }
 
 interface TopVulnsTableProps {
@@ -37,6 +39,23 @@ export default function TopVulnsTable({ data }: TopVulnsTableProps) {
       cellRenderer: (params: any) => {
         const tag = SEVERITY_TAG[params.value];
         return tag ? <Tag color={tag.color}>{tag.label}</Tag> : params.value;
+      },
+    },
+    {
+      field: 'layer_name', headerName: 'Catégorisation', width: 180,
+      cellRenderer: (p: any) => {
+        const name = p.data?.layer_name;
+        const color = p.data?.layer_color || '#8c8c8c';
+        if (!name) return <span style={{ color: '#8c8c8c' }}>—</span>;
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+              background: color, flexShrink: 0,
+            }} />
+            {name}
+          </span>
+        );
       },
     },
     { field: 'count', headerName: 'Occurrences', width: 120, sort: 'desc' },

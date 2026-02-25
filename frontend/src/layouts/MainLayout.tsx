@@ -16,11 +16,14 @@ import api from '../api/client';
 
 const { Header, Content } = Layout;
 
-const NAV_ITEMS = [
+const NAV_ITEMS: {
+  key: string; label: string; icon: React.ReactNode;
+  adminOnly?: boolean; monitoringOnly?: boolean;
+}[] = [
   { key: '/', label: 'Vue d\'ensemble', icon: <DashboardOutlined /> },
   { key: '/trends', label: 'Tendances', icon: <LineChartOutlined /> },
   { key: '/admin', label: 'Admin', icon: <SettingOutlined />, adminOnly: true },
-  { key: '/monitoring', label: 'Monitoring', icon: <MonitorOutlined />, adminOnly: true },
+  { key: '/monitoring', label: 'Monitoring', icon: <MonitorOutlined />, adminOnly: true, monitoringOnly: true },
   { key: '/profile', label: 'Mon Profil', icon: <UserOutlined /> },
 ];
 
@@ -66,9 +69,13 @@ export default function MainLayout() {
   }, [releaseNotes]);
 
   const isAdmin = user?.profile === 'admin';
+  const isMonitoring = user?.profile === 'monitoring';
 
   const menuItems = NAV_ITEMS
-    .filter((item) => !item.adminOnly || isAdmin)
+    .filter((item) => {
+      if (isMonitoring) return !!item.monitoringOnly;
+      return !item.adminOnly || isAdmin;
+    })
     .map(({ key, label, icon }) => ({ key, label, icon }));
 
   const selectedKey = menuItems

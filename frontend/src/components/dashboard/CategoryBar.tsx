@@ -15,6 +15,8 @@ interface TopVuln {
   title: string;
   severity: number;
   count: number;
+  layer_name: string | null;
+  layer_color: string | null;
 }
 
 interface CategoryBarProps {
@@ -69,9 +71,6 @@ function CustomTooltip({ active, payload }: any) {
       <div style={{ fontSize: 12, color: '#8c8c8c' }}>
         Occurrences : <strong style={{ color: item.fill }}>{item.count}</strong>
       </div>
-      <div style={{ fontSize: 11, color: '#1677ff', marginTop: 4, fontStyle: 'italic' }}>
-        Cliquer sur la barre pour voir le detail
-      </div>
     </div>
   );
 }
@@ -106,7 +105,7 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
           <Tooltip
             content={<CustomTooltip />}
             cursor={{ fill: 'rgba(0,0,0,0.06)' }}
-            wrapperStyle={{ zIndex: 1000 }}
+            wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
             {chartData.map((entry, index) => (

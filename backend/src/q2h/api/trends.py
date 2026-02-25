@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func, text, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from q2h.auth.dependencies import get_current_user, require_admin
+from q2h.auth.dependencies import get_current_user, require_admin, require_data_access
 from q2h.db.engine import get_db
 from q2h.db.models import TrendConfig, TrendTemplate, Vulnerability, ScanReport
 
@@ -63,7 +63,7 @@ class TrendQueryResponse(BaseModel):
 @router.get("/config", response_model=TrendConfigResponse)
 async def get_trend_config(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
 ):
     result = await db.execute(select(TrendConfig).limit(1))
     cfg = result.scalar_one_or_none()
@@ -104,7 +104,7 @@ async def update_trend_config(
 @router.get("/templates", response_model=list[TrendTemplateResponse])
 async def list_templates(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
 ):
     result = await db.execute(select(TrendTemplate))
     templates = result.scalars().all()
@@ -159,7 +159,7 @@ async def delete_template(
 async def execute_trend_query(
     body: TrendQueryRequest,
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_data_access),
 ):
     # Get config for timeout
     cfg_result = await db.execute(select(TrendConfig).limit(1))

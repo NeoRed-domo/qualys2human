@@ -20,7 +20,7 @@ BUILTIN_PROFILES = [
     {
         "name": "monitoring",
         "type": "builtin",
-        "permissions": {"monitoring": True, "dashboard": True},
+        "permissions": {"monitoring": True},
         "is_default": False,
     },
 ]

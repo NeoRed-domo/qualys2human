@@ -2,6 +2,7 @@ import { Card } from 'antd';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface LayerItem {
+  id: number | null;
   name: string | null;
   color: string | null;
   count: number;
@@ -9,15 +10,17 @@ interface LayerItem {
 
 interface LayerDonutProps {
   data: LayerItem[];
+  onClickLayer?: (layerId: number | null) => void;
 }
 
 const UNCLASSIFIED_COLOR = '#8c8c8c';
 
-export default function LayerDonut({ data }: LayerDonutProps) {
+export default function LayerDonut({ data, onClickLayer }: LayerDonutProps) {
   const chartData = data.map((d) => ({
     name: d.name || 'Autre',
     value: d.count,
     color: d.color || UNCLASSIFIED_COLOR,
+    layerId: d.id,
   }));
 
   return (
@@ -32,6 +35,8 @@ export default function LayerDonut({ data }: LayerDonutProps) {
             outerRadius={100}
             dataKey="value"
             nameKey="name"
+            onClick={(entry) => onClickLayer?.(entry.layerId)}
+            style={{ cursor: onClickLayer ? 'pointer' : 'default' }}
           >
             {chartData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Descriptions, Tag, Row, Col, Spin, Alert, Button } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef } from 'ag-grid-community';
@@ -46,6 +46,8 @@ interface VulnRow {
   first_detected: string | null;
   last_detected: string | null;
   tracking_method: string | null;
+  layer_name: string | null;
+  layer_color: string | null;
 }
 
 export default function HostDetail() {
@@ -55,6 +57,8 @@ export default function HostDetail() {
   const [vulns, setVulns] = useState<VulnRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sevFilter, setSevFilter] = useState<number | null>(null);
+  const [trackFilter, setTrackFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ip) return;
@@ -104,6 +108,17 @@ export default function HostDetail() {
   });
   const trackData = Object.entries(trackMap).map(([name, value]) => ({ name, value }));
 
+  // Apply local filters from pie chart clicks
+  let filteredVulns = vulns;
+  if (sevFilter !== null) {
+    filteredVulns = filteredVulns.filter((v) => v.severity === sevFilter);
+  }
+  if (trackFilter !== null) {
+    filteredVulns = filteredVulns.filter((v) => (v.tracking_method || 'Inconnu') === trackFilter);
+  }
+
+  const hasFilter = sevFilter !== null || trackFilter !== null;
+
   const vulnCols: ColDef<VulnRow>[] = [
     { field: 'qid', headerName: 'QID', width: 90 },
     { field: 'title', headerName: 'Titre', flex: 1, minWidth: 200 },
@@ -115,11 +130,46 @@ export default function HostDetail() {
       },
       sort: 'desc',
     },
-    { field: 'category', headerName: 'Catégorie', width: 140 },
+    {
+      field: 'layer_name', headerName: 'Catégorisation', width: 180,
+      cellRenderer: (p: any) => {
+        const name = p.data?.layer_name;
+        const color = p.data?.layer_color || '#8c8c8c';
+        if (!name) return <span style={{ color: '#8c8c8c' }}>—</span>;
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+              background: color, flexShrink: 0,
+            }} />
+            {name}
+          </span>
+        );
+      },
+    },
     { field: 'port', headerName: 'Port', width: 80 },
     { field: 'vuln_status', headerName: 'Statut', width: 110 },
     { field: 'last_detected', headerName: 'Dernière détection', width: 160 },
   ];
+
+  const filterTags = (
+    <span>
+      {sevFilter !== null && (
+        <Tag color="blue" closable onClose={() => setSevFilter(null)}>
+          {SEVERITY_LABELS[sevFilter] || `Sev ${sevFilter}`}
+        </Tag>
+      )}
+      {trackFilter !== null && (
+        <Tag color="blue" closable onClose={() => setTrackFilter(null)}>
+          {trackFilter}
+        </Tag>
+      )}
+    </span>
+  );
+
+  const tableTitle = hasFilter
+    ? <span>Vulnérabilités — filtre : {filterTags}</span>
+    : 'Vulnérabilités';
 
   return (
     <div>
@@ -148,7 +198,16 @@ export default function HostDetail() {
           <Card title="Sévérités" size="small">
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={sevData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" nameKey="name">
+                <Pie
+                  data={sevData}
+                  cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={85}
+                  dataKey="value" nameKey="name"
+                  onClick={(entry) => {
+                    setSevFilter((prev) => prev === entry.severity ? null : entry.severity);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   {sevData.map((entry, i) => (
                     <Cell key={i} fill={SEVERITY_COLORS[entry.severity] || '#8c8c8c'} />
                   ))}
@@ -157,6 +216,13 @@ export default function HostDetail() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
+            {sevFilter !== null && (
+              <div style={{ textAlign: 'center', marginTop: 4 }}>
+                <Button size="small" icon={<CloseCircleOutlined />} onClick={() => setSevFilter(null)}>
+                  Réinitialiser
+                </Button>
+              </div>
+            )}
           </Card>
         </Col>
         <Col xs={24} lg={12}>
@@ -164,7 +230,17 @@ export default function HostDetail() {
             <Card title="Méthodes de suivi" size="small">
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
-                  <Pie data={trackData} cx="50%" cy="50%" outerRadius={85} dataKey="value" nameKey="name" label>
+                  <Pie
+                    data={trackData}
+                    cx="50%" cy="50%"
+                    outerRadius={85}
+                    dataKey="value" nameKey="name"
+                    label
+                    onClick={(entry) => {
+                      setTrackFilter((prev) => prev === entry.name ? null : entry.name);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
                     {trackData.map((_, i) => (
                       <Cell key={i} fill={TRACKING_COLORS[i % TRACKING_COLORS.length]} />
                     ))}
@@ -173,15 +249,22 @@ export default function HostDetail() {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+              {trackFilter !== null && (
+                <div style={{ textAlign: 'center', marginTop: 4 }}>
+                  <Button size="small" icon={<CloseCircleOutlined />} onClick={() => setTrackFilter(null)}>
+                    Réinitialiser
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
         </Col>
       </Row>
 
-      <Card title="Vulnérabilités" size="small">
+      <Card title={tableTitle} size="small">
         <div style={{ height: 400 }}>
           <AgGridReact<VulnRow>
-            rowData={vulns}
+            rowData={filteredVulns}
             columnDefs={vulnCols}
             domLayout="normal"
             rowHeight={36}

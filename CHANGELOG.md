@@ -6,6 +6,27 @@ Format de version : `MAJOR.EVOLUTION.MINOR.BUILD`
 
 ---
 
+## [1.0.2.0] - 2026-02-25
+
+### Nouvelles fonctionnalites
+
+- **Drill-down interactif sur tous les graphiques** — Cliquer sur une section de camembert ou une barre filtre le tableau associe. Overview : filtre global par severite/categorie. VulnDetail : filtre par statut de detection. HostDetail : filtre par severite et methode de suivi.
+- **Colonne Categorisation avec badge couleur** — Tous les tableaux de vulnerabilites (TopVulnsTable, HostDetail) affichent la categorisation avec un point de couleur.
+- **Restriction profil monitoring** — Le profil monitoring n'a acces qu'a la page Monitoring. Backend `require_data_access` bloque l'acces aux donnees (403). Frontend `MonitoringGuard` redirige, navigation filtree.
+- **Fraicheur integree dans Regles entreprise** — Les seuils de fraicheur (stale_days, hide_days) sont configurables depuis la page Regles entreprise. Page Parametres supprimee.
+
+### Ameliorations
+
+- **Logo reduit a 75%** — Le logo sur la page de connexion fait desormais 75% de sa taille precedente (`maxHeight: 135px`).
+- **Page Parametres supprimee** — Fusionnee dans Regles entreprise. Tab et route retires.
+
+### Corrections de bugs
+
+- **Migration Alembic fiabilisee (BUG-005)** — Remplacement du driver asyncpg par psycopg2 synchrone pour les migrations Alembic, garantissant des transactions atomiques. Reecriture du rename avec un seul `UPDATE ... CASE WHEN` au lieu de multiple statements individuels. Corrige dans `backend/alembic/env.py`, `backend/alembic/versions/a1b2c3d4e5f6`, `installer/upgrade.py`.
+- **Tooltip Top 10 cliquable** — Le tooltip du graphique Top 10 interceptait les clics (z-index eleve). Corrige avec `pointerEvents: 'none'` sur le wrapperStyle. Texte "Cliquer pour voir le detail" supprime.
+
+---
+
 ## [1.0.1.0] - 2026-02-24
 
 ### Nouvelles fonctionnalites
