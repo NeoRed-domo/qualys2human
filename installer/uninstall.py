@@ -17,18 +17,14 @@ PACKAGE_ROOT = SCRIPT_DIR.parent
 
 def drop_database(install_dir: Path, logger) -> bool:
     """Drop the qualys2human database and q2h role."""
-    try:
-        import yaml
-    except ImportError:
-        logger.warning("PyYAML non disponible, suppression DB manuelle requise")
-        return False
+    from utils import load_config
 
     config_path = install_dir / "config.yaml"
     if not config_path.exists():
         logger.warning("config.yaml non trouve, suppression DB impossible")
         return False
 
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config = load_config(config_path)
     db = config.get("database", {})
 
     pg_bin = install_dir / "pgsql" / "bin" / "psql.exe"

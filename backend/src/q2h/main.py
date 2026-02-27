@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
     await db_engine.dispose_engine()
 
 
-APP_VERSION = "1.0.4.0"
+APP_VERSION = "1.0.4.1"
 
 RELEASE_NOTES = {
     "version": APP_VERSION,
@@ -114,7 +114,9 @@ RELEASE_NOTES = {
         "Endpoint GET /hosts avec filtre os_class (windows, nix, autre)",
         "Endpoint GET /vulnerabilities : nouveau filtre layer + colonnes catégorisation",
     ],
-    "fixes": [],
+    "fixes": [
+        "Correction crash upgrade : suppression dépendance PyYAML dans les scripts installer (stdlib uniquement)",
+    ],
     "improvements": [
         "Layout dashboard : flexbox avec espacement uniforme (remplace react-grid-layout)",
         "Tableaux Top 10 : auto-height sans ascenseur (domLayout autoHeight)",

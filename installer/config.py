@@ -2,7 +2,6 @@
 
 import os
 
-import yaml
 from pathlib import Path
 
 from utils import generate_password, generate_secret
@@ -45,10 +44,21 @@ def generate_config(
     }
 
     config_path = install_dir / "config.yaml"
-    config_path.write_text(
-        yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
+    # Write YAML manually to avoid PyYAML dependency in installer
+    lines = []
+    for section, values in config.items():
+        if isinstance(values, dict):
+            lines.append(f"{section}:")
+            for k, v in values.items():
+                if isinstance(v, bool):
+                    lines.append(f"  {k}: {'true' if v else 'false'}")
+                elif isinstance(v, list):
+                    lines.append(f"  {k}: []")
+                else:
+                    lines.append(f"  {k}: {v}")
+        else:
+            lines.append(f"{section}: {values}")
+    config_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("[OK] config.yaml genere: %s", config_path)
     return config_path
 

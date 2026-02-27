@@ -166,12 +166,12 @@ def _verify_connection(db_name: str, db_user: str, db_password: str,
 
 def _verify_config_password(install_dir: Path, db_password: str, logger) -> bool:
     """Check that config.yaml contains the expected password."""
-    import yaml
+    from utils import load_config
     config_path = install_dir / "config.yaml"
     if not config_path.exists():
         logger.error("config.yaml non trouve: %s", config_path)
         return False
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config = load_config(config_path)
     stored = config.get("database", {}).get("password", "")
     masked_expected = db_password[:4] + "..." if len(db_password) > 4 else "***"
     masked_stored = stored[:4] + "..." if len(stored) > 4 else "***"

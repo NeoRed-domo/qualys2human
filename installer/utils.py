@@ -113,3 +113,35 @@ def banner(version: str):
     print("  NeoRed (c) 2026")
     print("=" * 56)
     print()
+
+
+def load_config(path) -> dict:
+    """Parse a simple YAML config (2-level max) without PyYAML dependency.
+
+    Works for the Q2H config.yaml format (flat sections with key: value pairs).
+    """
+    from pathlib import Path
+    config: dict = {}
+    current_section: dict | None = None
+    for raw_line in Path(path).read_text(encoding="utf-8").splitlines():
+        stripped = raw_line.split("#")[0].rstrip()
+        if not stripped:
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip())
+        if indent == 0 and ":" in stripped:
+            key, _, val = stripped.partition(":")
+            val = val.strip().strip("'\"")
+            if val:
+                config[key.strip()] = val
+            else:
+                current_section = {}
+                config[key.strip()] = current_section
+        elif indent >= 2 and current_section is not None and ":" in stripped:
+            key, _, val = stripped.strip().partition(":")
+            val = val.strip().strip("'\"")
+            try:
+                val = int(val)  # type: ignore[assignment]
+            except (ValueError, TypeError):
+                pass
+            current_section[key.strip()] = val
+    return config

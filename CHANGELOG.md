@@ -6,6 +6,14 @@ Format de version : `MAJOR.EVOLUTION.MINOR.BUILD`
 
 ---
 
+## [1.0.4.1] - 2026-02-27
+
+### Corrections
+
+- **Fix crash upgrade PyYAML** — Les scripts installer (`upgrade.py`, `database.py`, `uninstall.py`, `config.py`) utilisaient `import yaml` (PyYAML) qui n'est pas disponible dans le Python systeme de l'installeur. Remplacement par un parseur YAML stdlib-only (`load_config()` dans `utils.py`). Corrige `ModuleNotFoundError: No module named 'yaml'` lors de la mise a jour.
+
+---
+
 ## [1.0.4.0] - 2026-02-27
 
 ### Nouvelles fonctionnalites

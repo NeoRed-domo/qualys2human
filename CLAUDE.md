@@ -10,7 +10,7 @@
   - EVOLUTION : grosse évolution de la version majeure
   - MINOR : petites améliorations, new features, UX tweaks
   - BUILD : corrections de bugs
-- **Version actuelle** : v1.0.4.0
+- **Version actuelle** : v1.0.4.1
 - **Fichiers à mettre à jour** quand la version change :
   - `backend/src/q2h/main.py` → `APP_VERSION` + `RELEASE_NOTES`
   - `CHANGELOG.md` (racine)

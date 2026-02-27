@@ -12,11 +12,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).absolute().parent))
 
-from utils import banner, check_admin, prompt, setup_logging
+from utils import banner, check_admin, load_config, prompt, setup_logging
 import service as service_mod
 
 SCRIPT_DIR = Path(__file__).absolute().parent
 PACKAGE_ROOT = SCRIPT_DIR.parent
+
 
 
 def detect_install_dir() -> Path | None:
@@ -54,8 +55,7 @@ def backup(install_dir: Path, logger) -> Path | None:
 
     dump_file = backup_dir / "qualys2human.sql"
     try:
-        import yaml
-        config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
+        config = load_config(install_dir / "config.yaml")
         db_conf = config.get("database", {})
         import os
         env = {**os.environ, "PGPASSWORD": db_conf.get("password", "")}
@@ -92,8 +92,7 @@ def run_migrations(install_dir: Path, logger) -> bool:
 
     # Read DB credentials from config.yaml and pass via env var
     # (same approach as database.py — bypasses the q2h config system)
-    import yaml
-    config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
+    config = load_config(install_dir / "config.yaml")
     db_conf = config.get("database", {})
     db_url = (
         f"postgresql+psycopg2://{db_conf.get('user', 'q2h')}:"
@@ -151,8 +150,7 @@ def rollback(install_dir: Path, backup_dir: Path, logger):
     dump_file = backup_dir / "qualys2human.sql"
     if dump_file.exists():
         logger.info("Restauration de la base de donnees...")
-        import yaml
-        config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
+        config = load_config(install_dir / "config.yaml")
         db_conf = config.get("database", {})
         db_name = db_conf.get("name", "qualys2human")
         db_user = db_conf.get("user", "q2h")
@@ -254,8 +252,7 @@ def main():
     service_mod._winsw(install_dir, "start", service_name, logger)
 
     # Health check
-    import yaml
-    config = yaml.safe_load((install_dir / "config.yaml").read_text(encoding="utf-8"))
+    config = load_config(install_dir / "config.yaml")
     port = config.get("server", {}).get("port", 8443)
     if not health_check(port, logger):
         logger.warning("L'application ne repond pas. Rollback...")
