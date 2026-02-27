@@ -5,7 +5,9 @@ import Login from './pages/Login';
 import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 import Overview from './pages/Overview';
+import VulnList from './pages/VulnList';
 import VulnDetail from './pages/VulnDetail';
+import HostList from './pages/HostList';
 import HostDetail from './pages/HostDetail';
 import FullDetail from './pages/FullDetail';
 
@@ -61,7 +63,9 @@ export default function AppRouter() {
           </Route>
           <Route path="monitoring" element={<Monitoring />} />
           <Route path="profile" element={<MonitoringGuard><Placeholder title="Mon Profil" /></MonitoringGuard>} />
+          <Route path="vulnerabilities" element={<MonitoringGuard><VulnList /></MonitoringGuard>} />
           <Route path="vulnerabilities/:qid" element={<MonitoringGuard><VulnDetail /></MonitoringGuard>} />
+          <Route path="hosts" element={<MonitoringGuard><HostList /></MonitoringGuard>} />
           <Route path="hosts/:ip" element={<MonitoringGuard><HostDetail /></MonitoringGuard>} />
           <Route path="hosts/:ip/vulnerabilities/:qid" element={<MonitoringGuard><FullDetail /></MonitoringGuard>} />
         </Route>

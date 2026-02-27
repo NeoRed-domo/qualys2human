@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Descriptions, Tag, Row, Col, Spin, Alert, Button, Typography, Divider } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import api from '../api/client';
-import ExportButtons from '../components/ExportButtons';
+import PdfExportButton from '../components/PdfExportButton';
+import { PdfReport } from '../utils/pdfExport';
+import { getLogoDataUrl } from '../utils/pdfLogo';
 
 const { Paragraph } = Typography;
 
@@ -90,13 +92,54 @@ export default function FullDetail() {
 
   const tag = SEVERITY_TAG[data.severity];
 
+  const handlePdfExport = async () => {
+    const logo = await getLogoDataUrl();
+    const pdf = new PdfReport(`Détail — ${data.ip} — QID ${data.qid}`, logo);
+
+    pdf.addDescriptions([
+      { label: 'IP', value: data.ip },
+      { label: 'DNS', value: data.dns || '—' },
+      { label: 'OS', value: data.os || '—' },
+      { label: 'QID', value: String(data.qid) },
+      { label: 'Type', value: data.type || '—' },
+      { label: 'Catégorie', value: data.category || '—' },
+      { label: 'Sévérité', value: tag ? tag.label : String(data.severity) },
+      { label: 'Statut', value: data.vuln_status || '—' },
+      { label: 'Port', value: data.port != null ? String(data.port) : '—' },
+      { label: 'Protocole', value: data.protocol || '—' },
+      { label: 'FQDN', value: data.fqdn || '—' },
+      { label: 'SSL', value: data.ssl != null ? (data.ssl ? 'Oui' : 'Non') : '—' },
+      { label: 'Méthode de suivi', value: data.tracking_method || '—' },
+      { label: 'Première détection', value: data.first_detected || '—' },
+      { label: 'Dernière détection', value: data.last_detected || '—' },
+      { label: 'Nb détections', value: data.times_detected != null ? String(data.times_detected) : '—' },
+      { label: 'Dernière correction', value: data.date_last_fixed || '—' },
+      { label: 'Ticket', value: data.ticket_state || '—' },
+      { label: 'PCI', value: data.pci_vuln != null ? (data.pci_vuln ? 'Oui' : 'Non') : '—' },
+      { label: 'CVSS Base', value: data.cvss_base || '—' },
+      { label: 'CVSS Temporal', value: data.cvss_temporal || '—' },
+      { label: 'CVSS3 Base', value: data.cvss3_base || '—' },
+      { label: 'CVSS3 Temporal', value: data.cvss3_temporal || '—' },
+      { label: 'Réf. vendeur', value: data.vendor_reference || '—' },
+      { label: 'Bugtraq ID', value: data.bugtraq_id || '—' },
+      { label: 'CVE', value: data.cve_ids?.join(', ') || '—' },
+    ]);
+
+    pdf.addTextBlock('Menace', data.threat);
+    pdf.addTextBlock('Impact', data.impact);
+    pdf.addTextBlock('Solution', data.solution);
+    pdf.addTextBlock('Résultats du scan', data.results);
+
+    pdf.save(`detail-${data.ip}-qid-${data.qid}.pdf`);
+  };
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Button icon={<ArrowLeftOutlined />} type="link" onClick={() => navigate(-1)} style={{ padding: 0 }}>
           Retour
         </Button>
-        <ExportButtons queryString={`view=detail&ip=${ip}&qid=${qid}`} />
+        <PdfExportButton onExport={handlePdfExport} />
       </div>
 
       <Card

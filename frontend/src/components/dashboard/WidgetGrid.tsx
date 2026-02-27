@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Responsive, WidthProvider } from 'react-grid-layout';
-import type { Layout } from 'react-grid-layout';
 import { Button, Tooltip } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import api from '../../api/client';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
-
-const ResponsiveGridLayout = WidthProvider(Responsive);
 
 export interface WidgetDef {
   key: string;
@@ -15,48 +9,67 @@ export interface WidgetDef {
   content: ReactNode;
 }
 
-const DEFAULT_LAYOUT: Layout[] = [
-  { i: 'kpi', x: 0, y: 0, w: 12, h: 3, isResizable: false },
-  { i: 'severity', x: 0, y: 3, w: 6, h: 9 },
-  { i: 'category', x: 6, y: 3, w: 6, h: 9 },
-  { i: 'topVulns', x: 0, y: 12, w: 6, h: 10 },
-  { i: 'topHosts', x: 6, y: 12, w: 6, h: 10 },
-];
+const DEFAULT_ORDER = ['kpi', 'distributions', 'category', 'topVulns', 'topHosts'];
+const WIDGET_GAP = 16;
 
 interface WidgetGridProps {
   widgets: WidgetDef[];
 }
 
 export default function WidgetGrid({ widgets }: WidgetGridProps) {
-  const [layout, setLayout] = useState<Layout[]>(DEFAULT_LAYOUT);
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [loaded, setLoaded] = useState(false);
+  const [dragKey, setDragKey] = useState<string | null>(null);
 
-  // Load saved layout from preferences
+  // Load saved order from preferences (backward-compatible with old layout format)
   useEffect(() => {
     api.get('/user/preferences')
       .then((resp) => {
         const saved = resp.data.layout;
         if (saved && Array.isArray(saved) && saved.length > 0) {
-          setLayout(saved);
+          const sorted = [...saved].sort((a: any, b: any) => a.y - b.y);
+          setOrder(sorted.map((l: any) => l.i));
         }
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
 
-  const handleLayoutChange = useCallback((newLayout: Layout[]) => {
-    setLayout(newLayout);
-    api.put('/user/preferences', { layout: newLayout }).catch(() => {});
+  const saveOrder = useCallback((newOrder: string[]) => {
+    // Save as layout format for backward compatibility
+    const layout = newOrder.map((key, i) => ({
+      i: key, x: 0, y: i, w: 12, h: 1,
+    }));
+    api.put('/user/preferences', { layout }).catch(() => {});
   }, []);
 
+  const handleReorder = useCallback((fromKey: string, toKey: string) => {
+    setOrder((prev) => {
+      const fromIdx = prev.indexOf(fromKey);
+      const toIdx = prev.indexOf(toKey);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const newOrder = [...prev];
+      newOrder.splice(fromIdx, 1);
+      newOrder.splice(toIdx, 0, fromKey);
+      saveOrder(newOrder);
+      return newOrder;
+    });
+  }, [saveOrder]);
+
   const handleReset = useCallback(() => {
-    setLayout(DEFAULT_LAYOUT);
+    setOrder(DEFAULT_ORDER);
     api.delete('/user/preferences/layout').catch(() => {});
   }, []);
 
   const widgetMap = new Map(widgets.map((w) => [w.key, w]));
 
   if (!loaded) return null;
+
+  // Ensure all widget keys are in the order (handles new widgets added later)
+  const orderedKeys = [
+    ...order.filter((k) => widgetMap.has(k)),
+    ...widgets.map((w) => w.key).filter((k) => !order.includes(k)),
+  ];
 
   return (
     <div>
@@ -67,25 +80,33 @@ export default function WidgetGrid({ widgets }: WidgetGridProps) {
           </Button>
         </Tooltip>
       </div>
-      <ResponsiveGridLayout
-        layouts={{ lg: layout }}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
-        cols={{ lg: 12, md: 12, sm: 6, xs: 1 }}
-        rowHeight={40}
-        margin={[12, 4]}
-        onLayoutChange={(current) => handleLayoutChange(current)}
-        draggableHandle=".widget-drag-handle"
-        isResizable={false}
-        compactType="vertical"
-        preventCollision={false}
-      >
-        {layout.map((item) => {
-          const widget = widgetMap.get(item.i);
-          if (!widget) return <div key={item.i} />;
+      <div style={{ display: 'flex', flexDirection: 'column', gap: WIDGET_GAP }}>
+        {orderedKeys.map((key) => {
+          const widget = widgetMap.get(key);
+          if (!widget) return null;
           return (
-            <div key={item.i} style={{ overflow: 'hidden' }}>
+            <div
+              key={key}
+              style={{ opacity: dragKey === key ? 0.5 : 1, transition: 'opacity 0.15s' }}
+            >
               <div
                 className="widget-drag-handle"
+                draggable
+                onDragStart={(e) => {
+                  setDragKey(key);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragEnd={() => setDragKey(null)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={() => {
+                  if (dragKey && dragKey !== key) {
+                    handleReorder(dragKey, key);
+                  }
+                  setDragKey(null);
+                }}
                 style={{
                   cursor: 'grab',
                   padding: '4px 12px',
@@ -100,13 +121,13 @@ export default function WidgetGrid({ widgets }: WidgetGridProps) {
               >
                 &#9776; {widget.label}
               </div>
-              <div style={{ padding: 12, height: 'calc(100% - 30px)', overflow: 'visible' }}>
+              <div style={{ padding: 12 }}>
                 {widget.content}
               </div>
             </div>
           );
         })}
-      </ResponsiveGridLayout>
+      </div>
     </div>
   );
 }

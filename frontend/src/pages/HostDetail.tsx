@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Descriptions, Tag, Row, Col, Spin, Alert, Button } from 'antd';
-import { ArrowLeftOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Button, Card, Descriptions, Tag, Row, Col, Spin, Alert } from 'antd';
+import { ArrowLeftOutlined, CloseCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef } from 'ag-grid-community';
 import api from '../api/client';
-import ExportButtons from '../components/ExportButtons';
+import { exportToCsv } from '../utils/csvExport';
+import PdfExportButton from '../components/PdfExportButton';
+import { PdfReport } from '../utils/pdfExport';
+import { getLogoDataUrl } from '../utils/pdfLogo';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -59,6 +62,8 @@ export default function HostDetail() {
   const [error, setError] = useState<string | null>(null);
   const [sevFilter, setSevFilter] = useState<number | null>(null);
   const [trackFilter, setTrackFilter] = useState<string | null>(null);
+  const sevChartRef = useRef<HTMLDivElement>(null);
+  const trackChartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!ip) return;
@@ -124,6 +129,10 @@ export default function HostDetail() {
     { field: 'title', headerName: 'Titre', flex: 1, minWidth: 200 },
     {
       field: 'severity', headerName: 'Sévérité', width: 120,
+      valueFormatter: (p) => {
+        const t = SEVERITY_TAG[p.value as number];
+        return t ? t.label : String(p.value ?? '');
+      },
       cellRenderer: (p: any) => {
         const t = SEVERITY_TAG[p.value];
         return t ? <Tag color={t.color}>{t.label}</Tag> : p.value;
@@ -132,6 +141,7 @@ export default function HostDetail() {
     },
     {
       field: 'layer_name', headerName: 'Catégorisation', width: 180,
+      valueFormatter: (p) => (p.data as VulnRow)?.layer_name || '',
       cellRenderer: (p: any) => {
         const name = p.data?.layer_name;
         const color = p.data?.layer_color || '#8c8c8c';
@@ -171,13 +181,50 @@ export default function HostDetail() {
     ? <span>Vulnérabilités — filtre : {filterTags}</span>
     : 'Vulnérabilités';
 
+  const handlePdfExport = async () => {
+    const logo = await getLogoDataUrl();
+    const pdf = new PdfReport(`Hôte ${info.ip}`, logo);
+
+    pdf.addDescriptions([
+      { label: 'IP', value: info.ip },
+      { label: 'DNS', value: info.dns || '—' },
+      { label: 'NetBIOS', value: info.netbios || '—' },
+      { label: 'OS', value: info.os || '—' },
+      { label: 'OS CPE', value: info.os_cpe || '—' },
+      { label: 'Vulnérabilités', value: String(info.vuln_count) },
+      { label: 'Premier scan', value: info.first_seen || '—' },
+      { label: 'Dernier scan', value: info.last_seen || '—' },
+    ]);
+
+    await pdf.addChartPair(sevChartRef.current, trackChartRef.current);
+
+    pdf.addSectionTitle('Vulnérabilités');
+    pdf.addTable(
+      [
+        { header: 'QID', dataKey: 'qid' },
+        { header: 'Titre', dataKey: 'title' },
+        { header: 'Sévérité', dataKey: 'severityLabel' },
+        { header: 'Catégorisation', dataKey: 'layer_name' },
+        { header: 'Port', dataKey: 'port' },
+        { header: 'Statut', dataKey: 'vuln_status' },
+        { header: 'Dernière détection', dataKey: 'last_detected' },
+      ],
+      filteredVulns.map((v) => ({
+        ...v,
+        severityLabel: SEVERITY_TAG[v.severity]?.label || String(v.severity),
+      })),
+    );
+
+    pdf.save(`hote-${info.ip}.pdf`);
+  };
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Button icon={<ArrowLeftOutlined />} type="link" onClick={() => navigate(-1)} style={{ padding: 0 }}>
           Retour
         </Button>
-        <ExportButtons queryString={`view=host&ip=${ip}`} />
+        <PdfExportButton onExport={handlePdfExport} />
       </div>
 
       <Card title={`Hôte ${info.ip}`} style={{ marginBottom: 16 }}>
@@ -195,6 +242,7 @@ export default function HostDetail() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={12}>
+          <div ref={sevChartRef}>
           <Card title="Sévérités" size="small">
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
@@ -213,7 +261,21 @@ export default function HostDetail() {
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend />
+                <Legend
+                  content={() => (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                      {sevData.map((entry) => (
+                        <span key={entry.severity} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                          <span style={{
+                            display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+                            background: SEVERITY_COLORS[entry.severity] || '#8c8c8c',
+                          }} />
+                          {entry.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                />
               </PieChart>
             </ResponsiveContainer>
             {sevFilter !== null && (
@@ -224,9 +286,11 @@ export default function HostDetail() {
               </div>
             )}
           </Card>
+          </div>
         </Col>
         <Col xs={24} lg={12}>
           {trackData.length > 0 && (
+            <div ref={trackChartRef}>
             <Card title="Méthodes de suivi" size="small">
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -246,7 +310,21 @@ export default function HostDetail() {
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend
+                    content={() => (
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                        {trackData.map((entry, i) => (
+                          <span key={entry.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                            <span style={{
+                              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+                              background: TRACKING_COLORS[i % TRACKING_COLORS.length],
+                            }} />
+                            {entry.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               {trackFilter !== null && (
@@ -257,11 +335,24 @@ export default function HostDetail() {
                 </div>
               )}
             </Card>
+            </div>
           )}
         </Col>
       </Row>
 
-      <Card title={tableTitle} size="small">
+      <Card
+        title={tableTitle}
+        size="small"
+        extra={
+          <Button
+            icon={<DownloadOutlined />}
+            size="small"
+            onClick={() => exportToCsv(vulnCols, filteredVulns, `vulnerabilites-${ip}.csv`)}
+          >
+            CSV
+          </Button>
+        }
+      >
         <div style={{ height: 400 }}>
           <AgGridReact<VulnRow>
             rowData={filteredVulns}

@@ -81,6 +81,11 @@ class LayerCount(BaseModel):
     count: int
 
 
+class OsClassCount(BaseModel):
+    name: str
+    count: int
+
+
 class OverviewResponse(BaseModel):
     total_vulns: int
     host_count: int
@@ -90,6 +95,7 @@ class OverviewResponse(BaseModel):
     top_hosts: list[TopHost]
     coherence_checks: list[CoherenceItem]
     layer_distribution: list[LayerCount]
+    os_class_distribution: list[OsClassCount]
     freshness_stale_days: int = 7
     freshness_hide_days: int = 30
 
@@ -274,6 +280,38 @@ async def dashboard_overview(
         for r in layer_rows
     ]
 
+    # --- OS class distribution ---
+    os_class_label = case(
+        (Host.os.ilike("%windows%"), "Windows"),
+        (or_(
+            Host.os.ilike("%linux%"),
+            Host.os.ilike("%unix%"),
+            Host.os.ilike("%ubuntu%"),
+            Host.os.ilike("%debian%"),
+            Host.os.ilike("%centos%"),
+            Host.os.ilike("%red hat%"),
+            Host.os.ilike("%rhel%"),
+            Host.os.ilike("%suse%"),
+            Host.os.ilike("%fedora%"),
+            Host.os.ilike("%aix%"),
+            Host.os.ilike("%solaris%"),
+            Host.os.ilike("%freebsd%"),
+        ), "NIX"),
+        else_="Autre",
+    ).label("os_class")
+    os_q = (
+        select(os_class_label, func.count(LatestVuln.id).label("count"))
+        .select_from(LatestVuln)
+        .join(Host, LatestVuln.host_id == Host.id)
+        .group_by(os_class_label)
+    )
+    os_q = _apply_filters(os_q, *fargs, host_joined=True)
+    os_q = _apply_freshness(os_q, freshness or "active", thresholds)
+    os_rows = (await db.execute(os_q)).all()
+    os_class_distribution = [
+        OsClassCount(name=r.os_class, count=r.count) for r in os_rows
+    ]
+
     return OverviewResponse(
         total_vulns=total_vulns,
         host_count=host_count,
@@ -283,6 +321,7 @@ async def dashboard_overview(
         top_hosts=top_hosts,
         coherence_checks=coherence_checks,
         layer_distribution=layer_distribution,
+        os_class_distribution=os_class_distribution,
         freshness_stale_days=thresholds["stale_days"],
         freshness_hide_days=thresholds["hide_days"],
     )

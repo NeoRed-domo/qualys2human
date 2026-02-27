@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, List, Button, Spin, message } from 'antd';
 import { PlayCircleOutlined } from '@ant-design/icons';
 import api from '../api/client';
 import TrendBuilder, { type TrendQueryParams } from '../components/trends/TrendBuilder';
 import TrendChart from '../components/trends/TrendChart';
-import ExportButtons from '../components/ExportButtons';
 import HelpTooltip from '../components/help/HelpTooltip';
+import PdfExportButton from '../components/PdfExportButton';
+import { PdfReport } from '../utils/pdfExport';
+import { getLogoDataUrl } from '../utils/pdfLogo';
 
 interface DataPoint {
   date: string;
@@ -26,6 +28,7 @@ export default function Trends() {
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [chartTitle, setChartTitle] = useState('Tendance');
+  const trendChartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.get('/trends/templates').then((r) => setTemplates(r.data)).catch(() => {});
@@ -58,9 +61,16 @@ export default function Trends() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 8 }}>
+        {series.length > 0 && (
+          <PdfExportButton onExport={async () => {
+            const logo = await getLogoDataUrl();
+            const pdf = new PdfReport(chartTitle, logo);
+            await pdf.addChartCapture(trendChartRef.current);
+            pdf.save('tendances.pdf');
+          }} />
+        )}
         <HelpTooltip topic="trends" />
-        <ExportButtons queryString="view=overview" />
       </div>
       <TrendBuilder onQuery={runQuery} loading={loading} />
 
@@ -90,7 +100,7 @@ export default function Trends() {
       )}
 
       <Spin spinning={loading}>
-        <TrendChart data={series} title={chartTitle} />
+        <TrendChart ref={trendChartRef} data={series} title={chartTitle} />
       </Spin>
     </div>
   );

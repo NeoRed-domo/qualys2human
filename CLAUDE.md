@@ -10,7 +10,7 @@
   - EVOLUTION : grosse évolution de la version majeure
   - MINOR : petites améliorations, new features, UX tweaks
   - BUILD : corrections de bugs
-- **Version actuelle** : v1.0.1.0
+- **Version actuelle** : v1.0.4.0
 - **Fichiers à mettre à jour** quand la version change :
   - `backend/src/q2h/main.py` → `APP_VERSION` + `RELEASE_NOTES`
   - `CHANGELOG.md` (racine)
@@ -41,10 +41,11 @@
   - `scripts/package.py` → `VERSION` (contrôle les noms `Qualys2Human-X.X.X.zip` et `.exe`)
   - `backend/src/q2h/main.py` → `APP_VERSION`
   - `CHANGELOG.md`
-- Après un push de release, **toujours fournir la commande `gh`** pour créer/uploader la release GitHub :
-  ```
-  gh release create vX.X.X.X "Qualys2Human-X.X.X.zip" "Qualys2Human-X.X.X.exe" --title "vX.X.X.X" --notes "..."
-  ```
+- Après un push de release, **toujours exécuter sans demander** :
+  1. `python scripts/build.py` (build frontend + backend)
+  2. `python scripts/package.py` (crée le .zip)
+  3. `gh release create vX.X.X.X "Qualys2Human-X.X.X.zip" --title "vX.X.X.X" --notes "..."`
+  - Ne **jamais** demander confirmation, le faire systématiquement à chaque release.
 
 ## Conventions code
 - Backend : endpoints dans `backend/src/q2h/api/`, modèles dans `backend/src/q2h/db/models.py`

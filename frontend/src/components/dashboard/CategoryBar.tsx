@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Card } from 'antd';
 import {
   BarChart,
@@ -94,9 +95,9 @@ function ClickableBar(props: any) {
   );
 }
 
-export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
+const CategoryBar = forwardRef<HTMLDivElement, CategoryBarProps>(function CategoryBar({ data, onClickBar }, ref) {
   const chartData: ChartItem[] = data.slice(0, 10).map((d) => ({
-    name: d.title.length > 30 ? d.title.slice(0, 27) + '...' : d.title,
+    name: d.title.length > 60 ? d.title.slice(0, 57) + '...' : d.title,
     fullTitle: d.title,
     count: d.count,
     qid: d.qid,
@@ -105,8 +106,9 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
   }));
 
   return (
+    <div ref={ref}>
     <Card title="Top 10 vulnérabilités (fréquence)" size="small">
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={380}>
         <BarChart
           data={chartData}
           layout="vertical"
@@ -114,7 +116,7 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis type="number" />
-          <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 12 }} />
+          <YAxis type="category" dataKey="name" width={280} tick={{ fontSize: 11 }} />
           <Tooltip
             content={<CustomTooltip />}
             cursor={false}
@@ -128,5 +130,8 @@ export default function CategoryBar({ data, onClickBar }: CategoryBarProps) {
         </BarChart>
       </ResponsiveContainer>
     </Card>
+    </div>
   );
-}
+});
+
+export default CategoryBar;

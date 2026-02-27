@@ -2,14 +2,31 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user, require_data_access
 from q2h.db.engine import get_db
-from q2h.db.models import LatestVuln, Host
+from q2h.db.models import LatestVuln, Host, VulnLayer, AppSettings
 
 router = APIRouter(prefix="/api/vulnerabilities", tags=["vulnerabilities"])
+
+
+class VulnListItem(BaseModel):
+    qid: int
+    title: str
+    severity: int
+    type: Optional[str] = None
+    category: Optional[str] = None
+    host_count: int
+    occurrence_count: int
+    layer_name: Optional[str] = None
+    layer_color: Optional[str] = None
+
+
+class VulnListResponse(BaseModel):
+    items: list[VulnListItem]
+    total: int
 
 
 class VulnDetailResponse(BaseModel):
@@ -45,6 +62,85 @@ class PaginatedHosts(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+async def _get_freshness_thresholds(db: AsyncSession) -> dict:
+    stale = (await db.execute(
+        select(AppSettings.value).where(AppSettings.key == "freshness_stale_days")
+    )).scalar() or "7"
+    hide = (await db.execute(
+        select(AppSettings.value).where(AppSettings.key == "freshness_hide_days")
+    )).scalar() or "30"
+    return {"stale_days": int(stale), "hide_days": int(hide)}
+
+
+def _apply_freshness(stmt, freshness_val: str, thresholds: dict):
+    if freshness_val == "all":
+        return stmt
+    if freshness_val == "stale":
+        return stmt.where(
+            LatestVuln.last_detected.is_not(None),
+            LatestVuln.last_detected < func.now() - text(f"interval '{thresholds['stale_days']} days'"),
+            LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['hide_days']} days'"),
+        )
+    return stmt.where(
+        or_(
+            LatestVuln.last_detected >= func.now() - text(f"interval '{thresholds['stale_days']} days'"),
+            LatestVuln.last_detected.is_(None),
+        )
+    )
+
+
+@router.get("", response_model=VulnListResponse)
+async def list_vulnerabilities(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_data_access),
+    severity: Optional[int] = Query(None, description="Filter by severity level"),
+    layer: Optional[int] = Query(None, description="Filter by layer ID (0 = unclassified)"),
+    freshness: Optional[str] = Query("active", description="Freshness: active, stale, all"),
+):
+    thresholds = await _get_freshness_thresholds(db)
+
+    q = (
+        select(
+            LatestVuln.qid,
+            func.min(LatestVuln.title).label("title"),
+            func.min(LatestVuln.severity).label("severity"),
+            func.min(LatestVuln.type).label("type"),
+            func.min(LatestVuln.category).label("category"),
+            func.count(func.distinct(LatestVuln.host_id)).label("host_count"),
+            func.count(LatestVuln.id).label("occurrence_count"),
+            func.min(VulnLayer.name).label("layer_name"),
+            func.min(VulnLayer.color).label("layer_color"),
+        )
+        .outerjoin(VulnLayer, LatestVuln.layer_id == VulnLayer.id)
+        .group_by(LatestVuln.qid)
+    )
+
+    if severity is not None:
+        q = q.where(LatestVuln.severity == severity)
+
+    if layer is not None:
+        if layer == 0:
+            q = q.where(LatestVuln.layer_id.is_(None))
+        else:
+            q = q.where(LatestVuln.layer_id == layer)
+
+    q = _apply_freshness(q, freshness or "active", thresholds)
+    q = q.order_by(func.count(LatestVuln.id).desc())
+
+    rows = (await db.execute(q)).all()
+
+    items = [
+        VulnListItem(
+            qid=r.qid, title=r.title, severity=r.severity,
+            type=r.type, category=r.category,
+            host_count=r.host_count, occurrence_count=r.occurrence_count,
+            layer_name=r.layer_name, layer_color=r.layer_color,
+        )
+        for r in rows
+    ]
+    return VulnListResponse(items=items, total=len(items))
 
 
 @router.get("/{qid}", response_model=VulnDetailResponse)

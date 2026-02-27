@@ -99,20 +99,27 @@ async def lifespan(app: FastAPI):
     await db_engine.dispose_engine()
 
 
-APP_VERSION = "1.0.3.0"
+APP_VERSION = "1.0.4.0"
 
 RELEASE_NOTES = {
     "version": APP_VERSION,
-    "date": "2026-02-25",
-    "title": "Filtres per-user et bouton Règles entreprise",
+    "date": "2026-02-27",
+    "title": "Widget Répartitions triple donut, drill-down complet, page liste serveurs",
     "features": [
-        "Filtres per-user : chaque utilisateur conserve ses propres filtres (localStorage isolé)",
-        "Bouton Règles entreprise : réapplique le preset admin à jour en un clic",
-        "Migration automatique de l'ancienne clé localStorage partagée vers la clé per-user",
+        "Widget Répartitions : 3 donuts côte à côte (Criticités, Classe d'OS, Catégorisation)",
+        "Donut Classe d'OS : répartition Windows / NIX / Autre des vulnérabilités",
+        "Drill-down Classe d'OS : clic sur une section ouvre la liste des serveurs filtrée",
+        "Drill-down Catégorisation : clic sur une section ouvre la liste des vulnérabilités filtrée par layer",
+        "Nouvelle page Liste des serveurs (/hosts) avec tableau, export PDF/CSV",
+        "Endpoint GET /hosts avec filtre os_class (windows, nix, autre)",
+        "Endpoint GET /vulnerabilities : nouveau filtre layer + colonnes catégorisation",
     ],
     "fixes": [],
     "improvements": [
-        "Zone de boutons FilterBar fusionnée et extensible",
+        "Layout dashboard : flexbox avec espacement uniforme (remplace react-grid-layout)",
+        "Tableaux Top 10 : auto-height sans ascenseur (domLayout autoHeight)",
+        "Tooltips donuts : affichent le nom de la section survolée",
+        "KPI Quick-wins et tag Cohérence retirés du dashboard (non implémentés)",
     ],
     "changelog_url": "https://github.com/NeoRed-domo/Qualys2Human/blob/master/CHANGELOG.md",
 }

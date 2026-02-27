@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from q2h.auth.dependencies import get_current_user, require_data_access
@@ -78,6 +78,63 @@ class FullDetailResponse(BaseModel):
     pci_vuln: Optional[bool] = None
     ticket_state: Optional[str] = None
     tracking_method: Optional[str] = None
+
+
+class HostListItem(BaseModel):
+    ip: str
+    dns: Optional[str] = None
+    os: Optional[str] = None
+    vuln_count: int
+
+
+class HostListResponse(BaseModel):
+    items: list[HostListItem]
+    total: int
+
+
+NIX_PATTERNS = [
+    "%linux%", "%unix%", "%ubuntu%", "%debian%", "%centos%",
+    "%red hat%", "%rhel%", "%suse%", "%fedora%", "%aix%",
+    "%solaris%", "%freebsd%",
+]
+
+
+@router.get("", response_model=HostListResponse)
+async def list_hosts(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_data_access),
+    os_class: Optional[str] = Query(None, description="OS class: windows, nix, autre"),
+):
+    q = (
+        select(
+            Host.ip,
+            Host.dns,
+            Host.os,
+            func.count(LatestVuln.id).label("vuln_count"),
+        )
+        .join(LatestVuln, LatestVuln.host_id == Host.id)
+        .group_by(Host.id, Host.ip, Host.dns, Host.os)
+        .order_by(func.count(LatestVuln.id).desc())
+    )
+
+    if os_class:
+        cls = os_class.strip().lower()
+        if cls == "windows":
+            q = q.where(Host.os.ilike("%windows%"))
+        elif cls == "nix":
+            q = q.where(or_(*(Host.os.ilike(p) for p in NIX_PATTERNS)))
+        elif cls == "autre":
+            q = q.where(
+                ~Host.os.ilike("%windows%"),
+                ~or_(*(Host.os.ilike(p) for p in NIX_PATTERNS)),
+            )
+
+    rows = (await db.execute(q)).all()
+    items = [
+        HostListItem(ip=r.ip, dns=r.dns, os=r.os, vuln_count=r.vuln_count)
+        for r in rows
+    ]
+    return HostListResponse(items=items, total=len(items))
 
 
 @router.get("/{ip}", response_model=HostDetailResponse)

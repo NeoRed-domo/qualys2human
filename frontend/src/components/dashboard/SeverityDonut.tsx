@@ -1,4 +1,4 @@
-import { Card } from 'antd';
+import { forwardRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const SEVERITY_COLORS: Record<number, string> = {
@@ -29,15 +29,18 @@ interface SeverityDonutProps {
   onClickSeverity?: (severity: number) => void;
 }
 
-export default function SeverityDonut({ data, onClickSeverity }: SeverityDonutProps) {
-  const chartData = data.map((d) => ({
-    name: SEVERITY_LABELS[d.severity] || `Sev ${d.severity}`,
-    value: d.count,
-    severity: d.severity,
-  }));
+const SeverityDonut = forwardRef<HTMLDivElement, SeverityDonutProps>(function SeverityDonut({ data, onClickSeverity }, ref) {
+  // Sort descending: Urgent (5) → Minimal (1)
+  const chartData = [...data]
+    .sort((a, b) => b.severity - a.severity)
+    .map((d) => ({
+      name: SEVERITY_LABELS[d.severity] || `Sev ${d.severity}`,
+      value: d.count,
+      severity: d.severity,
+    }));
 
   return (
-    <Card title="Répartition par sévérité" size="small">
+    <div ref={ref}>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
@@ -58,10 +61,26 @@ export default function SeverityDonut({ data, onClickSeverity }: SeverityDonutPr
               />
             ))}
           </Pie>
-          <Tooltip formatter={(value: number | undefined) => [value ?? 0, 'Vulnérabilités']} />
-          <Legend />
+          <Tooltip formatter={(value: number | undefined, name: string) => [value ?? 0, name]} />
+          <Legend
+            content={() => (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
+                {chartData.map((entry) => (
+                  <span key={entry.severity} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                    <span style={{
+                      display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+                      background: SEVERITY_COLORS[entry.severity] || '#8c8c8c',
+                    }} />
+                    {entry.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          />
         </PieChart>
       </ResponsiveContainer>
-    </Card>
+    </div>
   );
-}
+});
+
+export default SeverityDonut;

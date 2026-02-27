@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { Card } from 'antd';
+import { Button, Card } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef } from 'ag-grid-community';
+import { exportToCsv } from '../../utils/csvExport';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -27,20 +29,30 @@ export default function TopHostsTable({ data }: TopHostsTableProps) {
   ];
 
   return (
-    <Card title="Top 10 hôtes" size="small">
-      <div style={{ height: 360 }}>
-        <AgGridReact<TopHost>
-          rowData={data}
-          columnDefs={colDefs}
-          domLayout="normal"
-          rowHeight={36}
-          headerHeight={38}
-          onRowClicked={(e) => {
-            if (e.data) navigate(`/hosts/${e.data.ip}`);
-          }}
-          rowStyle={{ cursor: 'pointer' }}
-        />
-      </div>
+    <Card
+      title="Top 10 hôtes"
+      size="small"
+      extra={
+        <Button
+          icon={<DownloadOutlined />}
+          size="small"
+          onClick={() => exportToCsv(colDefs, data, 'top-hotes.csv')}
+        >
+          CSV
+        </Button>
+      }
+    >
+      <AgGridReact<TopHost>
+        rowData={data}
+        columnDefs={colDefs}
+        domLayout="autoHeight"
+        rowHeight={36}
+        headerHeight={38}
+        onRowClicked={(e) => {
+          if (e.data) navigate(`/hosts/${e.data.ip}`);
+        }}
+        rowStyle={{ cursor: 'pointer' }}
+      />
     </Card>
   );
 }

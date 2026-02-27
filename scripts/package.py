@@ -28,7 +28,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 ROOT = Path(__file__).absolute().parent.parent
-VERSION = "1.0.3.0"
+VERSION = "1.0.4.0"
 
 
 def ensure_build(build_dir: Path):
@@ -142,6 +142,9 @@ def create_sfx(zip_path: Path, sfx_path: Path):
 
     # Create 7z archive from zip contents
     archive_7z = zip_path.with_suffix(".7z")
+    # Clean stale artifacts to avoid 7z "Cannot open" errors
+    if archive_7z.exists():
+        archive_7z.unlink()
     # Extract zip to temp, then re-archive as 7z
     temp_dir = zip_path.parent / "_sfx_temp"
     if temp_dir.exists():

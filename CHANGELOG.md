@@ -6,6 +6,39 @@ Format de version : `MAJOR.EVOLUTION.MINOR.BUILD`
 
 ---
 
+## [1.0.4.0] - 2026-02-27
+
+### Nouvelles fonctionnalites
+
+- **Widget Repartitions triple donut** — Le dashboard affiche 3 donuts cote a cote : Criticites, Classe d'OS, Categorisation. Pleine largeur, responsive (empile en mobile).
+- **Donut Classe d'OS** — Nouveau graphique repartition Windows / NIX / Autre, base sur `Host.os` avec CASE WHEN (12 patterns NIX). Endpoint `os_class_distribution` dans `/dashboard/overview`.
+- **Drill-down Classe d'OS** — Clic sur une section du donut ouvre la nouvelle page `/hosts?os_class=X` avec la liste complete des serveurs de cette classe.
+- **Drill-down Categorisation** — Clic sur une section du donut ouvre `/vulnerabilities?layer=X` avec la liste des vulns de cette categorisation.
+- **Page Liste des serveurs** (`/hosts`) — Nouvelle page avec tableau AG Grid (IP, DNS, OS, Vulnerabilites), export PDF/CSV, clic ligne vers detail serveur.
+- **Endpoint GET /hosts** — Liste de serveurs avec `vuln_count`, filtre `os_class` (windows, nix, autre).
+- **Endpoint GET /vulnerabilities enrichi** — Nouveau filtre `layer` (0 = non classifie), colonnes `layer_name`/`layer_color` dans la reponse.
+
+### Ameliorations
+
+- **Layout dashboard flexbox** — Remplacement de react-grid-layout par un layout flexbox vertical avec `gap` uniforme. Espacement pixel-perfect, auto-dimensionnement des widgets. Drag-to-reorder conserve via HTML5 Drag & Drop.
+- **Tableaux Top 10 auto-height** — AG Grid en `domLayout: autoHeight`, plus d'ascenseur. Les tableaux affichent toutes les lignes.
+- **Tooltips donuts** — Affichent le nom de la section survolee (ex: "Urgent (5)", "Windows", nom de layer) au lieu du generique "Vulnerabilites".
+- **KPI Quick-wins retire** — Le KPI Quick-wins (toujours a 0, non implemente) est retire du dashboard.
+- **Tag Coherence retire** — Le tag "Coherence OK / Anomalies" est retire du dashboard (donnees toujours calculees cote backend pour usage futur).
+- **Export PDF mis a jour** — Les 3 donuts (severite + OS class en paire, layer separement) sont inclus dans l'export PDF.
+- **Colonne Categorisation dans VulnList** — La liste des vulnerabilites affiche desormais la categorisation avec badge couleur.
+- **Card retiree des donuts** — SeverityDonut et LayerDonut n'ont plus de Card englobante (geree par le widget parent).
+
+---
+
+## [1.0.3.0] - 2026-02-26
+
+### Nouvelles fonctionnalites
+
+- **Export PDF par page (client-side)** — Bouton PDF sur chaque page (Overview, VulnList, VulnDetail, HostDetail, FullDetail, Trends). Generation 100% client-side via jsPDF + jspdf-autotable + html2canvas. Compatible offline/air-gapped. Inclut en-tete avec logo, KPIs, graphiques captures, tableaux programmatiques, blocs texte. Layout A4 portrait avec sauts de page automatiques et pieds de page.
+
+---
+
 ## [1.0.3.0] - 2026-02-25
 
 ### Nouvelles fonctionnalites

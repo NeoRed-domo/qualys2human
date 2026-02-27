@@ -3,9 +3,6 @@ import {
   BugOutlined,
   DesktopOutlined,
   WarningOutlined,
-  ThunderboltOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
   BarChartOutlined,
 } from '@ant-design/icons';
 
@@ -13,16 +10,12 @@ interface KPICardsProps {
   totalVulns: number;
   hostCount: number;
   criticalCount: number;
-  quickWinsCount?: number;
-  coherenceOk: boolean;
 }
 
 export default function KPICards({
   totalVulns,
   hostCount,
   criticalCount,
-  quickWinsCount = 0,
-  coherenceOk,
 }: KPICardsProps) {
   return (
     <Row gutter={[16, 16]}>
@@ -62,29 +55,6 @@ export default function KPICards({
             prefix={<BarChartOutlined />}
           />
         </Card>
-      </Col>
-      <Col xs={24} sm={12} lg={6}>
-        <Card size="small">
-          <Statistic
-            title="Quick-wins"
-            value={quickWinsCount}
-            prefix={<ThunderboltOutlined />}
-            styles={{ content: { color: '#1677ff' } }}
-          />
-        </Card>
-      </Col>
-      <Col xs={24}>
-        <div style={{ textAlign: 'right' }}>
-          {coherenceOk ? (
-            <Tag icon={<CheckCircleOutlined />} color="success">
-              Cohérence OK
-            </Tag>
-          ) : (
-            <Tag icon={<ExclamationCircleOutlined />} color="warning">
-              Anomalies de cohérence détectées
-            </Tag>
-          )}
-        </div>
       </Col>
     </Row>
   );

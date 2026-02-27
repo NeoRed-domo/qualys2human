@@ -97,10 +97,40 @@ def install_service(install_dir: Path, service_name: str = SERVICE_NAME,
     return True
 
 
+def _wait_service_stopped(service_name: str, timeout: int = 30,
+                          logger=None) -> bool:
+    """Poll sc query until the service is fully stopped (or timeout)."""
+    import time
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            result = subprocess.run(
+                ["sc", "query", service_name],
+                capture_output=True, text=True, timeout=10,
+            )
+            # sc query output contains "STATE  : X  STOPPED"
+            if "STOPPED" in result.stdout:
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    if logger:
+        logger.warning("Timeout (%ds) en attente de l'arret du service", timeout)
+    return False
+
+
 def stop_service(install_dir: Path, service_name: str = SERVICE_NAME,
                  logger=None) -> bool:
-    """Stop the service."""
-    return _winsw(install_dir, "stop", service_name, logger)
+    """Stop the service and wait until it is fully stopped."""
+    ok = _winsw(install_dir, "stop", service_name, logger)
+    if ok:
+        if _wait_service_stopped(service_name, timeout=30, logger=logger):
+            if logger:
+                logger.info("[OK] Service '%s' arrete", service_name)
+        else:
+            if logger:
+                logger.warning("Le service n'est pas confirme arrete, poursuite...")
+    return ok
 
 
 def uninstall_service(install_dir: Path, service_name: str = SERVICE_NAME,

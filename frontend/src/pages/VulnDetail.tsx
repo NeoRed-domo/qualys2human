@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Descriptions, Tag, Row, Col, Spin, Alert, Button, Typography } from 'antd';
-import { ArrowLeftOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Button, Card, Descriptions, Tag, Row, Col, Spin, Alert, Typography } from 'antd';
+import { ArrowLeftOutlined, CloseCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef } from 'ag-grid-community';
 import api from '../api/client';
-import ExportButtons from '../components/ExportButtons';
+import { exportToCsv } from '../utils/csvExport';
+import PdfExportButton from '../components/PdfExportButton';
+import { PdfReport } from '../utils/pdfExport';
+import { getLogoDataUrl } from '../utils/pdfLogo';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -56,6 +59,7 @@ export default function VulnDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const trackingChartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!qid) return;
@@ -119,13 +123,53 @@ export default function VulnDetail() {
     )
     : 'Serveurs affectés';
 
+  const handlePdfExport = async () => {
+    const logo = await getLogoDataUrl();
+    const pdf = new PdfReport(`QID ${info.qid} — ${info.title}`, logo);
+
+    pdf.addDescriptions([
+      { label: 'QID', value: String(info.qid) },
+      { label: 'Sévérité', value: tag ? tag.label : String(info.severity) },
+      { label: 'Type', value: info.type || '—' },
+      { label: 'Catégorie', value: info.category || '—' },
+      { label: 'CVSS Base', value: info.cvss_base || '—' },
+      { label: 'CVSS3 Base', value: info.cvss3_base || '—' },
+      { label: 'Hôtes affectés', value: String(info.affected_host_count) },
+      { label: 'Occurrences totales', value: String(info.total_occurrences) },
+      { label: 'Réf. vendeur', value: info.vendor_reference || '—' },
+      { label: 'CVE', value: info.cve_ids?.join(', ') || '—' },
+    ]);
+
+    pdf.addTextBlock('Menace', info.threat);
+    pdf.addTextBlock('Impact', info.impact);
+    pdf.addTextBlock('Solution', info.solution);
+
+    await pdf.addChartCapture(trackingChartRef.current);
+
+    pdf.addSectionTitle('Serveurs affectés');
+    pdf.addTable(
+      [
+        { header: 'IP', dataKey: 'ip' },
+        { header: 'DNS', dataKey: 'dns' },
+        { header: 'OS', dataKey: 'os' },
+        { header: 'Port', dataKey: 'port' },
+        { header: 'Proto', dataKey: 'protocol' },
+        { header: 'Statut', dataKey: 'vuln_status' },
+        { header: 'Dernière détection', dataKey: 'last_detected' },
+      ],
+      filteredHosts,
+    );
+
+    pdf.save(`vuln-${info.qid}.pdf`);
+  };
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Button icon={<ArrowLeftOutlined />} type="link" onClick={() => navigate(-1)} style={{ padding: 0 }}>
           Retour
         </Button>
-        <ExportButtons queryString={`view=vulnerability&qid=${qid}`} />
+        <PdfExportButton onExport={handlePdfExport} />
       </div>
 
       <Card
@@ -185,7 +229,19 @@ export default function VulnDetail() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={16}>
-          <Card title={tableTitle} size="small">
+          <Card
+            title={tableTitle}
+            size="small"
+            extra={
+              <Button
+                icon={<DownloadOutlined />}
+                size="small"
+                onClick={() => exportToCsv(hostCols, filteredHosts, `serveurs-qid-${qid}.csv`)}
+              >
+                CSV
+              </Button>
+            }
+          >
             <div style={{ height: 360 }}>
               <AgGridReact<HostRow>
                 rowData={filteredHosts}
@@ -203,6 +259,7 @@ export default function VulnDetail() {
         </Col>
         <Col xs={24} lg={8}>
           {trackingData.length > 0 && (
+            <div ref={trackingChartRef}>
             <Card title="Statut de détection" size="small">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -224,7 +281,21 @@ export default function VulnDetail() {
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend
+                    content={() => (
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                        {trackingData.map((entry, i) => (
+                          <span key={entry.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                            <span style={{
+                              display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+                              background: TRACKING_COLORS[i % TRACKING_COLORS.length],
+                            }} />
+                            {entry.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               {statusFilter && (
@@ -235,6 +306,7 @@ export default function VulnDetail() {
                 </div>
               )}
             </Card>
+            </div>
           )}
         </Col>
       </Row>

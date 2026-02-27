@@ -10,6 +10,7 @@ build/
 keys/
 certs/
 data/
+docs/
 *.db
 
 # Backend config (contains passwords — use config.yaml.example as template)

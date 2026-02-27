@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Card, Empty } from 'antd';
 import {
   LineChart,
@@ -23,7 +24,7 @@ interface TrendChartProps {
   title?: string;
 }
 
-export default function TrendChart({ data, title = 'Tendance' }: TrendChartProps) {
+const TrendChart = forwardRef<HTMLDivElement, TrendChartProps>(function TrendChart({ data, title = 'Tendance' }, ref) {
   if (data.length === 0) {
     return (
       <Card title={title} size="small">
@@ -40,6 +41,7 @@ export default function TrendChart({ data, title = 'Tendance' }: TrendChartProps
     // Simple single line
     const chartData = data.map((d) => ({ date: d.date, value: d.value }));
     return (
+      <div ref={ref}>
       <Card title={title} size="small">
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -51,6 +53,7 @@ export default function TrendChart({ data, title = 'Tendance' }: TrendChartProps
           </LineChart>
         </ResponsiveContainer>
       </Card>
+      </div>
     );
   }
 
@@ -65,6 +68,7 @@ export default function TrendChart({ data, title = 'Tendance' }: TrendChartProps
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return (
+    <div ref={ref}>
     <Card title={title} size="small">
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -86,5 +90,8 @@ export default function TrendChart({ data, title = 'Tendance' }: TrendChartProps
         </LineChart>
       </ResponsiveContainer>
     </Card>
+    </div>
   );
-}
+});
+
+export default TrendChart;

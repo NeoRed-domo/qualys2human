@@ -1,26 +1,26 @@
 import { forwardRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-interface LayerItem {
-  id: number | null;
-  name: string | null;
-  color: string | null;
+const OS_COLORS: Record<string, string> = {
+  Windows: '#1677ff',
+  NIX: '#52c41a',
+  Autre: '#8c8c8c',
+};
+
+interface OsClassItem {
+  name: string;
   count: number;
 }
 
-interface LayerDonutProps {
-  data: LayerItem[];
-  onClickLayer?: (layerId: number | null) => void;
+interface OsClassDonutProps {
+  data: OsClassItem[];
+  onClickClass?: (className: string) => void;
 }
 
-const UNCLASSIFIED_COLOR = '#8c8c8c';
-
-const LayerDonut = forwardRef<HTMLDivElement, LayerDonutProps>(function LayerDonut({ data, onClickLayer }, ref) {
+const OsClassDonut = forwardRef<HTMLDivElement, OsClassDonutProps>(function OsClassDonut({ data, onClickClass }, ref) {
   const chartData = data.map((d) => ({
-    name: d.name || 'Autre',
+    name: d.name,
     value: d.count,
-    color: d.color || UNCLASSIFIED_COLOR,
-    layerId: d.id,
   }));
 
   return (
@@ -35,22 +35,25 @@ const LayerDonut = forwardRef<HTMLDivElement, LayerDonutProps>(function LayerDon
             outerRadius={100}
             dataKey="value"
             nameKey="name"
-            onClick={(entry) => onClickLayer?.(entry.layerId)}
-            style={{ cursor: onClickLayer ? 'pointer' : 'default' }}
+            onClick={(entry) => onClickClass?.(entry.name)}
+            style={{ cursor: onClickClass ? 'pointer' : 'default' }}
           >
             {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
+              <Cell
+                key={`cell-${index}`}
+                fill={OS_COLORS[entry.name] || '#8c8c8c'}
+              />
             ))}
           </Pie>
           <Tooltip formatter={(value: number | undefined, name: string) => [value ?? 0, name]} />
           <Legend
             content={() => (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
                 {chartData.map((entry) => (
                   <span key={entry.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
                     <span style={{
                       display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
-                      background: entry.color,
+                      background: OS_COLORS[entry.name] || '#8c8c8c',
                     }} />
                     {entry.name}
                   </span>
@@ -64,4 +67,4 @@ const LayerDonut = forwardRef<HTMLDivElement, LayerDonutProps>(function LayerDon
   );
 });
 
-export default LayerDonut;
+export default OsClassDonut;
